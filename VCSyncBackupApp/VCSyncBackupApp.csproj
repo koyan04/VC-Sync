@@ -11,9 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Resource Include="..\vcsync-logo.png">
-      <Link>Assets\vcsync-logo.png</Link>
-    </Resource>
     <Resource Include="Assets\vcsync-logo.ico" />
   </ItemGroup>
 
