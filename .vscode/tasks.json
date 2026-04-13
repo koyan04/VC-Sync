@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build VC Sync Backup App",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				".\\VCSyncBackupApp.sln"
+			],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}
