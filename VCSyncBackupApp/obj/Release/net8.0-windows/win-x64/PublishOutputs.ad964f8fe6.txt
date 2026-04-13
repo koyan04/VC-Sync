@@ -1,0 +1,5 @@
+C:\Users\Ko Yan\projects\VC-Sync\publish\win-x64\VCSyncBackupApp.exe
+C:\Users\Ko Yan\projects\VC-Sync\publish\win-x64\VCSyncBackupApp.dll
+C:\Users\Ko Yan\projects\VC-Sync\publish\win-x64\VCSyncBackupApp.deps.json
+C:\Users\Ko Yan\projects\VC-Sync\publish\win-x64\VCSyncBackupApp.runtimeconfig.json
+C:\Users\Ko Yan\projects\VC-Sync\publish\win-x64\VCSyncBackupApp.pdb
