@@ -47,11 +47,14 @@ public sealed class MainViewModel : ObservableObject
 
         AddServerCommand = new RelayCommand(AddServer, () => !IsBusy);
         DeleteServerCommand = new RelayCommand(DeleteSelectedServer, () => SelectedServer is not null && !IsBusy);
+        DeleteAllServersCommand = new RelayCommand(DeleteAllServers, () => Servers.Count > 0 && !IsBusy);
         SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync, () => !IsBusy);
         StartBackupCommand = new AsyncRelayCommand(StartBackupAsync, () => Servers.Count > 0 && !IsBusy);
         StopBackupCommand = new RelayCommand(StopBackup, () => IsBusy);
         ImportServersCommand = new AsyncRelayCommand(ImportServersAsync, () => !IsBusy);
         ExportServersCommand = new AsyncRelayCommand(ExportServersAsync, () => Servers.Count > 0 && !IsBusy);
+        ImportConfigCommand = new AsyncRelayCommand(ImportConfigurationAsync, () => !IsBusy);
+        ExportConfigCommand = new AsyncRelayCommand(ExportConfigurationAsync, () => !IsBusy);
         BrowseAssemblyCommand = new RelayCommand(BrowseAssembly, () => !IsBusy);
         BrowseKeyCommand = new RelayCommand(BrowsePrivateKey, () => !IsBusy);
         BrowseBaseDirectoryCommand = new RelayCommand(BrowseBaseDirectory, () => !IsBusy);
@@ -127,11 +130,14 @@ public sealed class MainViewModel : ObservableObject
 
     public RelayCommand AddServerCommand { get; }
     public RelayCommand DeleteServerCommand { get; }
+    public RelayCommand DeleteAllServersCommand { get; }
     public AsyncRelayCommand SaveSettingsCommand { get; }
     public AsyncRelayCommand StartBackupCommand { get; }
     public RelayCommand StopBackupCommand { get; }
     public AsyncRelayCommand ImportServersCommand { get; }
     public AsyncRelayCommand ExportServersCommand { get; }
+    public AsyncRelayCommand ImportConfigCommand { get; }
+    public AsyncRelayCommand ExportConfigCommand { get; }
     public RelayCommand BrowseAssemblyCommand { get; }
     public RelayCommand BrowseKeyCommand { get; }
     public RelayCommand BrowseBaseDirectoryCommand { get; }
@@ -201,6 +207,33 @@ public sealed class MainViewModel : ObservableObject
 
         Servers.Remove(SelectedServer);
         SelectedServer = null;
+        RecalculateOverallProgress();
+        RaiseAllCanExecuteChanges();
+    }
+
+    private void DeleteAllServers()
+    {
+        if (Servers.Count == 0)
+        {
+            return;
+        }
+
+        var confirm = WpfMessageBox.Show(
+            "Delete all configured servers?",
+            "Confirm",
+            WpfMessageBoxButton.YesNo,
+            WpfMessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        Servers.Clear();
+        SelectedServer = null;
+        RecalculateOverallProgress();
+        LogText = $"[{DateTime.Now:HH:mm:ss}] Cleared all servers.";
+        RaiseAllCanExecuteChanges();
     }
 
     private async Task SaveSettingsAsync()
@@ -514,6 +547,91 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task ExportConfigurationAsync()
+    {
+        var dialog = new WpfSaveFileDialog
+        {
+            Filter = "VC Sync Config (*.vcsync.json)|*.vcsync.json|JSON Files (*.json)|*.json",
+            FileName = "vc-sync-config.vcsync.json"
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var config = new AppConfig
+            {
+                WinScpAssemblyPath = WinScpAssemblyPath.Trim(),
+                PrivateKeyPath = PrivateKeyPath.Trim(),
+                BaseBackupDirectory = BaseBackupDirectory.Trim(),
+                RetentionCount = Math.Max(1, RetentionCount),
+                Servers = Servers.ToList()
+            };
+
+            await using var stream = File.Create(dialog.FileName);
+            await JsonSerializer.SerializeAsync(stream, config, new JsonSerializerOptions { WriteIndented = true });
+            LogText = $"Exported configuration to {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            WpfMessageBox.Show($"Configuration export failed.\n{ex.Message}", "Export Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+        }
+    }
+
+    private async Task ImportConfigurationAsync()
+    {
+        var dialog = new WpfOpenFileDialog
+        {
+            Filter = "VC Sync Config (*.vcsync.json)|*.vcsync.json|JSON Files (*.json)|*.json|All Files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(dialog.FileName);
+            var config = await JsonSerializer.DeserializeAsync<AppConfig>(stream)
+                ?? throw new InvalidOperationException("Configuration file is invalid.");
+
+            WinScpAssemblyPath = config.WinScpAssemblyPath;
+            PrivateKeyPath = config.PrivateKeyPath;
+            BaseBackupDirectory = config.BaseBackupDirectory;
+            RetentionCount = config.RetentionCount <= 0 ? 1 : config.RetentionCount;
+
+            Servers.Clear();
+            foreach (var server in config.Servers)
+            {
+                server.Status = "Idle";
+                server.ProgressPercent = 0;
+                server.ProgressDetail = "0 B / 0 B";
+                Servers.Add(server);
+            }
+
+            await _settingsService.SaveAsync(new AppConfig
+            {
+                WinScpAssemblyPath = WinScpAssemblyPath,
+                PrivateKeyPath = PrivateKeyPath,
+                BaseBackupDirectory = BaseBackupDirectory,
+                RetentionCount = RetentionCount,
+                Servers = Servers.ToList()
+            });
+
+            RecalculateOverallProgress();
+            RaiseAllCanExecuteChanges();
+            LogText = $"Imported configuration from {dialog.FileName}";
+        }
+        catch (Exception ex)
+        {
+            WpfMessageBox.Show($"Configuration import failed.\n{ex.Message}", "Import Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+        }
+    }
+
     private void BrowseAssembly()
     {
         var dialog = new WpfOpenFileDialog
@@ -557,11 +675,14 @@ public sealed class MainViewModel : ObservableObject
     {
         AddServerCommand.RaiseCanExecuteChanged();
         DeleteServerCommand.RaiseCanExecuteChanged();
+        DeleteAllServersCommand.RaiseCanExecuteChanged();
         SaveSettingsCommand.RaiseCanExecuteChanged();
         StartBackupCommand.RaiseCanExecuteChanged();
         StopBackupCommand.RaiseCanExecuteChanged();
         ImportServersCommand.RaiseCanExecuteChanged();
         ExportServersCommand.RaiseCanExecuteChanged();
+        ImportConfigCommand.RaiseCanExecuteChanged();
+        ExportConfigCommand.RaiseCanExecuteChanged();
         BrowseAssemblyCommand.RaiseCanExecuteChanged();
         BrowseKeyCommand.RaiseCanExecuteChanged();
         BrowseBaseDirectoryCommand.RaiseCanExecuteChanged();

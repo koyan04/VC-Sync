@@ -1,0 +1,46 @@
+name: release-installer
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore .\VCSyncBackupApp.sln
+
+      - name: Publish
+        run: dotnet publish .\VCSyncBackupApp\VCSyncBackupApp.csproj -c Release -r win-x64 --self-contained false -o .\publish\win-x64
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc ".\installer\VC-Sync-Setup.iss"
+
+      - name: Publish GitHub Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer\dist\VC-Sync-Setup-*.exe
+          generate_release_notes: true

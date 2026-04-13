@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="VC Sync Backup"
-        Icon="Assets/vcsync-logo.png"
+        Icon="Assets/vcsync-logo.ico"
         Width="1280"
         Height="820"
         WindowStartupLocation="CenterScreen"
@@ -128,6 +128,7 @@
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
                     <Button Click="AddServerButton_OnClick" Content="Add" />
                     <Button Command="{Binding DeleteServerCommand}" Background="{StaticResource DangerBrush}" Content="Delete" />
+                    <Button Command="{Binding DeleteAllServersCommand}" Background="#DC2626" Content="Delete All" />
                     <Button Command="{Binding ImportServersCommand}" Background="#0369A1" Content="Import JSON" />
                     <Button Command="{Binding ExportServersCommand}" Background="#0369A1" Content="Export JSON" />
                 </StackPanel>
@@ -186,11 +187,32 @@
                 </ScrollViewer>
 
                 <Border Grid.Row="8" Margin="0,12,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <Button Command="{Binding ExportConfigCommand}" Background="#0F766E" ToolTip="Backup Configuration">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" Margin="0,0,6,0" />
+                                    <TextBlock Text="Backup" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ImportConfigCommand}" Background="#0F766E" ToolTip="Restore Configuration">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" Margin="0,0,6,0" />
+                                    <TextBlock Text="Restore" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button MinWidth="100" Background="#0EA5A0" Click="AboutButton_OnClick" Content="About" />
                         <Button Command="{Binding SaveSettingsCommand}" Content="Save Settings" />
                         <Button Command="{Binding StartBackupCommand}" Content="Start Backup" />
-                    </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
         </Border>

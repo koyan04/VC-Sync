@@ -2,6 +2,12 @@
 
 Windows desktop backup tool for Outline VPN servers with WinSCP .NET automation, selective zipping, retention, and per-server logs.
 
+## Download
+
+- Installer page (GitHub Pages): https://koyan04.github.io/VC-Sync/
+- Latest release: https://github.com/koyan04/VC-Sync/releases/latest
+- Direct installer (v1.0.0): https://github.com/koyan04/VC-Sync/releases/download/v1.0.0/VC-Sync-Setup-1.0.0.exe
+
 ## Features
 
 - Server management UI (add/edit/delete)
@@ -66,3 +72,13 @@ For each server:
 - Host key checking is intentionally relaxed via WinSCP session option equivalent to `hostkey="*"`.
 - If no folders match `01*`, zip creation is skipped and logged.
 - Passphrase is not stored in plain text.
+
+## Release Automation
+
+Yes, GitHub Actions should be used for repeatable installer releases.
+
+This repository now includes:
+
+- Workflow: `.github/workflows/release-installer.yml`
+- Trigger: push tag matching `v*`
+- Output: Windows installer attached to GitHub Release
