@@ -51,7 +51,7 @@ public partial class MainWindow : Window
     {
         ShowThemedDialog(
             "About VC Sync",
-            "Owner: VChannel\nDeveloper: @sir_yan\nApp Name: VC Sync\nVersion: 1.0.0");
+            "Owner: VChannel\nDeveloper: @sir_yan\nApp Name: VC Sync\nVersion: 2.0.0");
     }
 
     private void LogTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
@@ -73,5 +73,10 @@ public partial class MainWindow : Window
     {
         _pauseAutoScroll = false;
         LogTextBox.ScrollToEnd();
+    }
+
+    private void RestoreTerminalTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
+    {
+        RestoreTerminalTextBox.ScrollToEnd();
     }
 }

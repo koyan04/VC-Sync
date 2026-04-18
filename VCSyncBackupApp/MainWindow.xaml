@@ -12,6 +12,7 @@
         Background="#0F172A"
         FontFamily="Segoe UI">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <SolidColorBrush x:Key="PanelBrush" Color="#111827" />
         <SolidColorBrush x:Key="BorderBrush" Color="#334155" />
         <SolidColorBrush x:Key="TextBrush" Color="#E2E8F0" />
@@ -23,12 +24,38 @@
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
         </Style>
 
+        <Style x:Key="GlyphMutedStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="GlyphOnButtonStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="#1F2937" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="8,6" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#1F2937" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinHeight" Value="34" />
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#0B1220" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
         </Style>
 
         <Style TargetType="Button">
@@ -52,209 +79,503 @@
     </Window.Resources>
 
     <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="200" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.4*" />
-            <ColumnDefinition Width="1*" />
-        </Grid.ColumnDefinitions>
-
-        <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="18" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#111827">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock FontSize="26" FontWeight="Bold" Text="VChannel Backup Automation" />
-                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Outline VPN server backup manager with selective archive and retention" />
-                    <ProgressBar Margin="0,12,20,0" Height="10" Minimum="0" Maximum="100" Value="{Binding OverallProgress}" />
-                    <TextBlock Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}" Text="{Binding OverallProgress, StringFormat=Overall Progress: {0}%}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Command="{Binding StartBackupCommand}" MinWidth="140" Content="Backup All" />
-                    <Button Command="{Binding StopBackupCommand}" MinWidth="110" Background="#B91C1C" Content="Stop" />
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1" Grid.Column="0" Margin="0,14,10,12" Padding="12" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource PanelBrush}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Server Management" />
-
-                <DataGrid Grid.Row="1"
-                          Margin="0,10,0,8"
-                          ItemsSource="{Binding Servers}"
-                          SelectedItem="{Binding SelectedServer}"
-                          AutoGenerateColumns="False"
-                          CanUserAddRows="False"
-                          HeadersVisibility="Column"
-                          ColumnHeaderHeight="34"
-                          RowBackground="#0B1220"
-                          AlternatingRowBackground="#111827"
-                          Background="#0B1220"
-                          Foreground="{StaticResource TextBrush}"
-                          BorderBrush="{StaticResource BorderBrush}"
-                          GridLinesVisibility="Horizontal">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
-                        <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
-                        <DataGridTextColumn Header="Remote Data Path" Binding="{Binding RemoteDataPath, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" />
-                        <DataGridTextColumn Header="Remote Config Path" Binding="{Binding RemoteConfigPath, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" />
-                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" IsReadOnly="True" Width="0.8*" />
-                        <DataGridTemplateColumn Header="Progress" Width="1*">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel>
-                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="14" />
-                                        <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="{Binding ProgressDetail}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
-
-                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Button Click="AddServerButton_OnClick" Content="Add" />
-                    <Button Command="{Binding DeleteServerCommand}" Background="{StaticResource DangerBrush}" Content="Delete" />
-                    <Button Command="{Binding DeleteAllServersCommand}" Background="#DC2626" Content="Delete All" />
-                    <Button Command="{Binding ImportServersCommand}" Background="#0369A1" Content="Import JSON" />
-                    <Button Command="{Binding ExportServersCommand}" Background="#0369A1" Content="Export JSON" />
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="1" Grid.RowSpan="2" Grid.Column="1" Margin="10,14,0,0" Padding="12" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource PanelBrush}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Configuration" />
-
-                <TextBlock Grid.Row="1" Margin="0,14,0,4" Text="WinSCPnet.dll Path" />
-                <DockPanel Grid.Row="2">
-                    <TextBox Text="{Binding WinScpAssemblyPath, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Command="{Binding BrowseAssemblyCommand}" Margin="8,0,0,0" Content="Browse" />
-                </DockPanel>
-
-                <TextBlock Grid.Row="3" Margin="0,12,0,4" Text="Private Key (.ppk)" />
-                <DockPanel Grid.Row="4">
-                    <TextBox Text="{Binding PrivateKeyPath, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Command="{Binding BrowseKeyCommand}" Margin="8,0,0,0" Content="Browse" />
-                </DockPanel>
-
-                <TextBlock Grid.Row="5" Margin="0,12,0,4" Text="Private Key Passphrase" />
-                <PasswordBox Grid.Row="6"
-                             Name="PassphraseBox"
-                             PasswordChanged="PassphraseBox_OnPasswordChanged"
-                             Background="#1F2937"
-                             Foreground="{StaticResource TextBrush}"
-                             BorderBrush="{StaticResource BorderBrush}"
-                             BorderThickness="1"
-                             Padding="8,6" />
-
-                <ScrollViewer Grid.Row="7" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel>
-                        <TextBlock Margin="0,0,0,4" Text="Base Backup Directory" />
-                        <DockPanel>
-                            <TextBox Text="{Binding BaseBackupDirectory, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button Command="{Binding BrowseBaseDirectoryCommand}" Margin="8,0,0,0" Content="Browse" />
-                        </DockPanel>
-
-                        <TextBlock Margin="0,12,0,4" Text="Retention Count (keep latest N zip files)" />
-                        <TextBox Text="{Binding RetentionCount, UpdateSourceTrigger=PropertyChanged}" />
-                    </StackPanel>
-                </ScrollViewer>
-
-                <Border Grid.Row="8" Margin="0,12,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                            <Button Command="{Binding ExportConfigCommand}" Background="#0F766E" ToolTip="Backup Configuration">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" Margin="0,0,6,0" />
-                                    <TextBlock Text="Backup" />
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ImportConfigCommand}" Background="#0F766E" ToolTip="Restore Configuration">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" Margin="0,0,6,0" />
-                                    <TextBlock Text="Restore" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button MinWidth="100" Background="#0EA5A0" Click="AboutButton_OnClick" Content="About" />
-                        <Button Command="{Binding SaveSettingsCommand}" Content="Save Settings" />
-                        <Button Command="{Binding StartBackupCommand}" Content="Start Backup" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </Grid>
-        </Border>
-
-        <Border Grid.Row="2" Grid.Column="0" Margin="0,0,10,0" Padding="12" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#020617">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+        <Grid Visibility="{Binding IsHomePage, Converter={StaticResource BoolToVisibility}}">
+            <Border Padding="28" CornerRadius="16" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#111827">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock FontSize="17" FontWeight="SemiBold" Text="Execution Logs" />
-                    <CheckBox Grid.Column="1"
-                              Name="PauseAutoScrollCheckBox"
-                              VerticalAlignment="Center"
-                              Margin="10,0,0,0"
-                              Foreground="{StaticResource MutedTextBrush}"
-                              Content="Pause auto-scroll"
-                              Checked="PauseAutoScrollCheckBox_OnChecked"
-                              Unchecked="PauseAutoScrollCheckBox_OnUnchecked" />
-                </Grid>
-                <TextBox Grid.Row="1"
-                         Name="LogTextBox"
-                         Margin="0,8,0,0"
-                         Text="{Binding LogText}"
-                         IsReadOnly="True"
-                         TextChanged="LogTextBox_OnTextChanged"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto"
-                         TextWrapping="Wrap"
-                         FontFamily="Consolas"
-                         Background="#020617"
-                         BorderBrush="{StaticResource BorderBrush}" />
-            </Grid>
-        </Border>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-        <Border Grid.Row="3" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10,8" CornerRadius="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
-            <TextBlock HorizontalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Text="Copyright (c) VChannel All Rights Reserved" />
-        </Border>
+                    <StackPanel>
+                        <TextBlock FontSize="30" FontWeight="Bold" Text="VC Sync Control Center" />
+                        <TextBlock Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Choose a workflow to back up or restore your server state." />
+                    </StackPanel>
+
+                    <UniformGrid Grid.Row="2" Margin="0,30,0,20" Columns="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border Margin="10" Padding="20" Width="360" CornerRadius="14" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
+                            <StackPanel>
+                                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Backup Servers" />
+                                <TextBlock Margin="0,8,0,16" Foreground="{StaticResource MutedTextBrush}" Text="Manage servers, run selective zip backup, and monitor execution logs." TextWrapping="Wrap" />
+                                <Button MinHeight="44" Command="{Binding NavigateBackupPageCommand}" Content="Open Backup Page" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="10" Padding="20" Width="360" CornerRadius="14" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
+                            <StackPanel>
+                                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Restore Server" />
+                                <TextBlock Margin="0,8,0,16" Foreground="{StaticResource MutedTextBrush}" Text="Upload backup zip and config json, then run guided server restore." TextWrapping="Wrap" />
+                                <Button MinHeight="44" Background="#0F766E" Command="{Binding NavigateRestorePageCommand}" Content="Open Restore Page" />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button MinWidth="120" Background="#0EA5A0" Click="AboutButton_OnClick" Content="About" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Grid Visibility="{Binding IsBackupPage, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Button HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="120" Command="{Binding NavigateHomeCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE80F;" Margin="0,0,6,0" />
+                        <TextBlock Foreground="White" Text="Main Page" />
+                    </StackPanel>
+                </Button>
+
+                <Grid Margin="0,44,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="200" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.4*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="18" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#111827">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock FontSize="26" FontWeight="Bold" Text="VChannel Backup Automation" />
+                                <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Outline VPN server backup manager with selective archive and retention" />
+                                <ProgressBar Margin="0,12,20,0" Height="10" Minimum="0" Maximum="100" Value="{Binding OverallProgress}" />
+                                <TextBlock Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}" Text="{Binding OverallProgress, StringFormat=Overall Progress: {0}%}" />
+                                <CheckBox Margin="0,10,0,0"
+                                          IsChecked="{Binding BackupConfigOnly}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE898;" Margin="0,0,6,0" />
+                                        <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Only config backup (skip data archive)" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Command="{Binding StartBackupCommand}" MinWidth="140" Content="Backup All" />
+                                <Button Command="{Binding StartSelectedBackupCommand}" MinWidth="150" Background="#0F766E" Content="Backup Selected" />
+                                <Button Command="{Binding StopBackupCommand}" MinWidth="110" Background="#B91C1C" Content="Stop" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="0" Margin="0,14,10,12" Padding="12" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource PanelBrush}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Server Management" />
+
+                            <DataGrid Grid.Row="1"
+                                      Margin="0,10,0,8"
+                                      ItemsSource="{Binding Servers}"
+                                      SelectedItem="{Binding SelectedServer}"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      HeadersVisibility="Column"
+                                      ColumnHeaderHeight="34"
+                                      RowBackground="#0B1220"
+                                      AlternatingRowBackground="#111827"
+                                      Background="#0B1220"
+                                      Foreground="{StaticResource TextBrush}"
+                                      BorderBrush="{StaticResource BorderBrush}"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
+                                    <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress, UpdateSourceTrigger=PropertyChanged}" Width="1.1*" />
+                                    <DataGridTextColumn Header="Remote Data Path" Binding="{Binding RemoteDataPath, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" />
+                                    <DataGridTextColumn Header="Remote Config Path" Binding="{Binding RemoteConfigPath, UpdateSourceTrigger=PropertyChanged}" Width="1.5*" />
+                                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" IsReadOnly="True" Width="0.8*" />
+                                    <DataGridTemplateColumn Header="Progress" Width="1*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="14" />
+                                                    <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="{Binding ProgressDetail}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
+                                <Button Click="AddServerButton_OnClick" Content="Add" />
+                                <Button Command="{Binding DeleteServerCommand}" Background="{StaticResource DangerBrush}" Content="Delete" />
+                                <Button Command="{Binding DeleteAllServersCommand}" Background="#DC2626" Content="Delete All" />
+                                <Button Command="{Binding ImportServersCommand}" Background="#0369A1" Content="Import JSON" />
+                                <Button Command="{Binding ExportServersCommand}" Background="#0369A1" Content="Export JSON" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.RowSpan="2" Grid.Column="1" Margin="10,14,0,0" Padding="12" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource PanelBrush}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Configuration" />
+
+                            <TextBlock Grid.Row="1" Margin="0,14,0,4" Text="WinSCPnet.dll Path" />
+                            <DockPanel Grid.Row="2">
+                                <TextBox Text="{Binding WinScpAssemblyPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Command="{Binding BrowseAssemblyCommand}" Margin="8,0,0,0" Content="Browse" />
+                            </DockPanel>
+
+                            <TextBlock Grid.Row="3" Margin="0,12,0,4" Text="Private Key (.ppk)" />
+                            <DockPanel Grid.Row="4">
+                                <TextBox Text="{Binding PrivateKeyPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Command="{Binding BrowseKeyCommand}" Margin="8,0,0,0" Content="Browse" />
+                            </DockPanel>
+
+                            <TextBlock Grid.Row="5" Margin="0,12,0,4" Text="Private Key Passphrase" />
+                            <PasswordBox Grid.Row="6"
+                                         Name="PassphraseBox"
+                                         PasswordChanged="PassphraseBox_OnPasswordChanged"
+                                         Background="#1F2937"
+                                         Foreground="{StaticResource TextBrush}"
+                                         BorderBrush="{StaticResource BorderBrush}"
+                                         BorderThickness="1"
+                                         Padding="8,6" />
+
+                            <ScrollViewer Grid.Row="7" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                    <TextBlock Margin="0,0,0,4" Text="Base Backup Directory" />
+                                    <DockPanel>
+                                        <TextBox Text="{Binding BaseBackupDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Command="{Binding BrowseBaseDirectoryCommand}" Margin="8,0,0,0" Content="Browse" />
+                                    </DockPanel>
+
+                                    <TextBlock Margin="0,12,0,4" Text="Retention Count (keep latest N zip files)" />
+                                    <TextBox Text="{Binding RetentionCount, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </ScrollViewer>
+
+                            <Border Grid.Row="8" Margin="0,12,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Button Command="{Binding ExportConfigCommand}" Background="#0F766E" ToolTip="Backup Configuration">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" Margin="0,0,6,0" />
+                                                <TextBlock Text="Backup" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Command="{Binding ImportConfigCommand}" Background="#0F766E" ToolTip="Restore Configuration">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" Margin="0,0,6,0" />
+                                                <TextBlock Text="Restore" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Command="{Binding SaveSettingsCommand}" Content="Save Settings" />
+                                        <Button Command="{Binding StartBackupCommand}" Content="Start Backup" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="2" Grid.Column="0" Margin="0,0,10,0" Padding="12" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#020617">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock FontSize="17" FontWeight="SemiBold" Text="Execution Logs" />
+                                <CheckBox Grid.Column="1"
+                                          Name="PauseAutoScrollCheckBox"
+                                          VerticalAlignment="Center"
+                                          Margin="10,0,0,0"
+                                          Foreground="{StaticResource MutedTextBrush}"
+                                          Content="Pause auto-scroll"
+                                          Checked="PauseAutoScrollCheckBox_OnChecked"
+                                          Unchecked="PauseAutoScrollCheckBox_OnUnchecked" />
+                            </Grid>
+                            <TextBox Grid.Row="1"
+                                     Name="LogTextBox"
+                                     Margin="0,8,0,0"
+                                     Text="{Binding LogText}"
+                                     IsReadOnly="True"
+                                     TextChanged="LogTextBox_OnTextChanged"
+                                     AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     TextWrapping="Wrap"
+                                     FontFamily="Consolas"
+                                     Background="#020617"
+                                     BorderBrush="{StaticResource BorderBrush}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Margin="0,10,0,0" Padding="10,8" CornerRadius="10" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
+                        <TextBlock HorizontalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Text="Copyright (c) VChannel All Rights Reserved" />
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <Grid Visibility="{Binding IsRestorePage, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Button HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="120" Command="{Binding NavigateHomeCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE80F;" Margin="0,0,6,0" />
+                        <TextBlock Foreground="White" Text="Main Page" />
+                    </StackPanel>
+                </Button>
+
+                <Grid Margin="0,44,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.15*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="18" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#111827">
+                        <StackPanel>
+                            <TextBlock FontSize="26" FontWeight="Bold" Text="Server Restore" />
+                            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Restore backup zip and configuration json to the selected server destination." />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="0" Margin="0,14,10,0" Padding="16" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource PanelBrush}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Restore Inputs" />
+
+                            <TextBlock Grid.Row="1" Margin="0,14,0,4" Text="Server IP Address" />
+                            <TextBox Grid.Row="2" Text="{Binding RestoreServerIpAddress, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <StackPanel Grid.Row="3" Margin="0,12,0,4" Orientation="Horizontal">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Opacity" Value="1" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRestoreDataZipEnabled}" Value="False">
+                                                <Setter Property="Opacity" Value="0.6" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE8B7;" Margin="0,0,6,0" />
+                                <TextBlock Text="Data Zip File" />
+                            </StackPanel>
+                            <StackPanel Grid.Row="4">
+                                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2,2,2,2">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Opacity" Value="1" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRestoreDataZipEnabled}" Value="False">
+                                                    <Setter Property="Opacity" Value="0.65" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <DockPanel IsEnabled="{Binding IsRestoreDataZipEnabled}">
+                                        <TextBox Text="{Binding RestoreDataZipFilePath, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Command="{Binding BrowseRestoreDataZipCommand}" Margin="8,0,0,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE838;" Margin="0,0,6,0" />
+                                                <TextBlock Foreground="White" Text="Browse" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DockPanel>
+                                </Border>
+                                <TextBlock Margin="2,6,0,0" FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="Disabled because 'Only config restore' is enabled.">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRestoreDataZipEnabled}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="5" Margin="0,12,0,4" Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE8A5;" Margin="0,0,6,0" />
+                                <TextBlock Text="Configuration JSON File" />
+                            </StackPanel>
+                            <DockPanel Grid.Row="6">
+                                <TextBox Text="{Binding RestoreConfigFilePath, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Command="{Binding BrowseRestoreConfigCommand}" Margin="8,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE838;" Margin="0,0,6,0" />
+                                        <TextBlock Foreground="White" Text="Browse" />
+                                    </StackPanel>
+                                </Button>
+                            </DockPanel>
+
+                            <StackPanel Grid.Row="7" Margin="0,12,0,0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE707;" Margin="0,0,6,0" />
+                                    <TextBlock Text="Destination Path" />
+                                </StackPanel>
+                                <Border Padding="8,6" CornerRadius="6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
+                                    <StackPanel>
+                                        <RadioButton GroupName="RestoreDestinationGroup"
+                                                     IsChecked="{Binding IsRootRestoreDestinationSelected}"
+                                                     Margin="0,0,0,8">
+                                            <TextBlock Foreground="{StaticResource TextBrush}" Text="/root/shadowbox/persisted-state/" />
+                                        </RadioButton>
+                                        <RadioButton GroupName="RestoreDestinationGroup"
+                                                     IsChecked="{Binding IsOutlineRestoreDestinationSelected}">
+                                            <TextBlock Foreground="{StaticResource TextBrush}" Text="/opt/outline/persisted-state/" />
+                                        </RadioButton>
+                                    </StackPanel>
+                                </Border>
+                                <Border Margin="0,6,0,0" Padding="8,5" CornerRadius="6" Background="#0B1220" BorderBrush="#1E293B" BorderThickness="1">
+                                    <TextBlock Foreground="#E2E8F0" FontWeight="SemiBold" Text="{Binding RestoreDestinationPath, StringFormat=Selected path: {0}}" />
+                                </Border>
+
+                                <CheckBox Margin="0,12,0,0"
+                                          IsChecked="{Binding IsRestoreDryRun}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE70F;" Margin="0,0,6,0" />
+                                        <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Dry run (preview commands only, no server changes)" />
+                                    </StackPanel>
+                                </CheckBox>
+
+                                <CheckBox Margin="0,8,0,0"
+                                          IsChecked="{Binding RestoreConfigOnly}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE8A5;" Margin="0,0,6,0" />
+                                        <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Only config restore (upload config and restart shadowbox)" />
+                                    </StackPanel>
+                                </CheckBox>
+
+                                <TextBlock Margin="0,16,0,0" Foreground="{StaticResource MutedTextBrush}" Text="The restore process runs server commands in sequence: install unzip, backup old data, upload files, extract, replace 01* folders, and restart shadowbox." TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Grid Grid.Row="8" Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Text="{Binding RestoreSessionStatus, StringFormat=Session Status: {0}}" />
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button MinWidth="120" Background="#0369A1" Command="{Binding RefreshRestorePreviewCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE70F;" Margin="0,0,6,0" />
+                                            <TextBlock Foreground="White" Text="Preview" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button MinWidth="120" Background="#0F766E" Command="{Binding StartRestoreCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE8A5;" Margin="0,0,6,0" />
+                                            <TextBlock Foreground="White" Text="Restore" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button MinWidth="120" Background="#B91C1C" Command="{Binding AbortRestoreCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE711;" Margin="0,0,6,0" />
+                                            <TextBlock Foreground="White" Text="Abort" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="1" Margin="10,14,0,0" Padding="16" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#020617">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE756;" Margin="0,0,6,0" />
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Server Terminal" />
+                            </StackPanel>
+
+                            <TabControl Grid.Row="1" Margin="0,10,0,0" Background="#020617" BorderBrush="{StaticResource BorderBrush}">
+                                <TabItem Header="Terminal">
+                                    <TextBox Name="RestoreTerminalTextBox"
+                                             Text="{Binding RestoreTerminalText}"
+                                             TextChanged="RestoreTerminalTextBox_OnTextChanged"
+                                             IsReadOnly="True"
+                                             AcceptsReturn="True"
+                                             VerticalScrollBarVisibility="Auto"
+                                             TextWrapping="Wrap"
+                                             FontFamily="Consolas"
+                                             Background="#020617"
+                                             BorderBrush="{StaticResource BorderBrush}" />
+                                </TabItem>
+                                <TabItem Header="Command Preview">
+                                    <TextBox Text="{Binding RestoreCommandPreview}"
+                                             IsReadOnly="True"
+                                             AcceptsReturn="True"
+                                             VerticalScrollBarVisibility="Auto"
+                                             TextWrapping="NoWrap"
+                                             FontFamily="Consolas"
+                                             Background="#020617"
+                                             BorderBrush="{StaticResource BorderBrush}" />
+                                </TabItem>
+                            </TabControl>
+
+                            <StackPanel Grid.Row="2" Margin="0,12,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button MinWidth="140" Background="#475569" Command="{Binding EndRestoreSessionCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE7E8;" Margin="0,0,6,0" />
+                                        <TextBlock Foreground="White" Text="End Session" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
     </Grid>
 </Window>

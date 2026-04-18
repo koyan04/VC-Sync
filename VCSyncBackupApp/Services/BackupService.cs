@@ -19,6 +19,7 @@ public sealed class BackupService
         string passphrase,
         string logRoot,
         IProgress<ServerBackupProgress>? progress,
+        bool configOnly,
         CancellationToken cancellationToken)
     {
         var serverBase = Path.Combine(config.BaseBackupDirectory, server.Name);
@@ -28,7 +29,10 @@ public sealed class BackupService
         var logFile = Path.Combine(logRoot, $"{server.Name}.log");
 
         Directory.CreateDirectory(serverBase);
-        Directory.CreateDirectory(dataFolder);
+        if (!configOnly)
+        {
+            Directory.CreateDirectory(dataFolder);
+        }
         Directory.CreateDirectory(logRoot);
 
         var logger = new List<string>
@@ -50,31 +54,47 @@ public sealed class BackupService
                     var sessionOptions = BuildSessionOptions(winscpAssembly, server, config, passphrase);
                     using var session = CreateSession(winscpAssembly);
                     OpenSession(session, sessionOptions);
+                    logger.Add($"[{DateTime.Now:HH:mm:ss}] Connected to server via WinSCP .NET assembly");
+
+                    if (configOnly)
+                    {
+                        progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 60, Message = "Downloading config" });
+                        var remoteConfig = server.RemoteConfigPath.Replace('\\', '/');
+                        var localConfig = Path.Combine(serverBase, Path.GetFileName(remoteConfig));
+                        DownloadFile(session, remoteConfig, localConfig);
+                        logger.Add($"[{DateTime.Now:HH:mm:ss}] Config download complete: {localConfig}");
+                        return;
+                    }
 
                     var totalDataBytes = EstimateRemoteDataSizeBytes(session, server.RemoteDataPath);
                     using var transferSubscription = AttachTransferProgressHandler(session, server.Name, totalDataBytes, progress);
-
-                    logger.Add($"[{DateTime.Now:HH:mm:ss}] Connected to server via WinSCP .NET assembly");
 
                     progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 35, Message = "Synchronizing data" });
                     SynchronizeDirectory(session, server.RemoteDataPath, dataFolder);
                     logger.Add($"[{DateTime.Now:HH:mm:ss}] Data sync complete");
 
                     progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 55, Message = "Downloading config" });
-                    var remoteConfig = server.RemoteConfigPath.Replace('\\', '/');
-                    var localConfig = Path.Combine(serverBase, Path.GetFileName(remoteConfig));
-                    DownloadFile(session, remoteConfig, localConfig);
-                    logger.Add($"[{DateTime.Now:HH:mm:ss}] Config download complete: {localConfig}");
+                    var remoteConfig2 = server.RemoteConfigPath.Replace('\\', '/');
+                    var localConfig2 = Path.Combine(serverBase, Path.GetFileName(remoteConfig2));
+                    DownloadFile(session, remoteConfig2, localConfig2);
+                    logger.Add($"[{DateTime.Now:HH:mm:ss}] Config download complete: {localConfig2}");
                 }
                 catch (Exception ex) when (ShouldFallbackToCli(ex))
                 {
                     logger.Add($"[{DateTime.Now:HH:mm:ss}] WinSCP .NET assembly incompatible on this runtime. Falling back to WinSCP CLI.");
 
                     progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 30, Message = "Using WinSCP CLI fallback" });
-                    RunWinScpCliTransfer(server, config, passphrase, dataFolder, serverBase, logger, progress, cancellationToken);
+                    RunWinScpCliTransfer(server, config, passphrase, dataFolder, serverBase, configOnly, logger, progress, cancellationToken);
                     logger.Add($"[{DateTime.Now:HH:mm:ss}] Connected and transferred via WinSCP CLI fallback");
                 }
             }, cancellationToken);
+
+            if (configOnly)
+            {
+                logger.Add($"[{DateTime.Now:HH:mm:ss}] Config-only backup completed.");
+                progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Success", ProgressPercent = 100, Message = "Completed (config only)" });
+                return;
+            }
 
             progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 75, Message = "Creating selective zip" });
             var zippedAny = CreateSelectiveZip(dataFolder, zipPath, logger, server.Name, progress);
@@ -319,6 +339,7 @@ public sealed class BackupService
         string passphrase,
         string dataFolder,
         string serverBase,
+        bool configOnly,
         List<string> logger,
         IProgress<ServerBackupProgress>? progress,
         CancellationToken cancellationToken)
@@ -329,9 +350,12 @@ public sealed class BackupService
         var remoteData = server.RemoteDataPath.Replace('\\', '/');
         var remoteConfig = server.RemoteConfigPath.Replace('\\', '/');
         var localConfig = Path.Combine(serverBase, Path.GetFileName(remoteConfig));
-        var remoteTotalBytes = TryGetRemoteDirectorySizeViaCli(cliPath, server, config, passphrase);
+        var remoteTotalBytes = configOnly ? null : TryGetRemoteDirectorySizeViaCli(cliPath, server, config, passphrase);
 
-        Directory.CreateDirectory(dataFolder);
+        if (!configOnly)
+        {
+            Directory.CreateDirectory(dataFolder);
+        }
 
         var scriptPath = Path.Combine(Path.GetTempPath(), $"winscp_{Guid.NewGuid():N}.txt");
         try
@@ -341,10 +365,10 @@ public sealed class BackupService
                 "option batch abort",
                 "option confirm off",
                 $"open sftp://root@{EscapeWinScpArg(server.IpAddress)}/ -privatekey=\"{EscapeWinScpArg(config.PrivateKeyPath)}\" -passphrase=\"{EscapeWinScpArg(passphrase)}\" -hostkey=\"*\"",
-                $"synchronize local \"{EscapeWinScpArg(dataFolder)}\" \"{EscapeWinScpArg(remoteData)}\"",
+                configOnly ? string.Empty : $"synchronize local \"{EscapeWinScpArg(dataFolder)}\" \"{EscapeWinScpArg(remoteData)}\"",
                 $"get \"{EscapeWinScpArg(remoteConfig)}\" \"{EscapeWinScpArg(localConfig)}\"",
                 "exit"
-            };
+            }.Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
 
             File.WriteAllLines(scriptPath, scriptLines);
 
@@ -373,7 +397,7 @@ public sealed class BackupService
 
                 stdOutBuilder.AppendLine(args.Data);
 
-                if (TryParseCliTransferLine(args.Data, out var fileName, out var filePercent))
+                if (!configOnly && TryParseCliTransferLine(args.Data, out var fileName, out var filePercent))
                 {
                     progress?.Report(new ServerBackupProgress
                     {
@@ -387,7 +411,9 @@ public sealed class BackupService
                 var transferPercent = TryExtractPercent(args.Data);
                 if (transferPercent.HasValue)
                 {
-                    var mapped = 10 + (int)Math.Round((transferPercent.Value / 100d) * 60);
+                    var mapped = configOnly
+                        ? 60 + (int)Math.Round((transferPercent.Value / 100d) * 35)
+                        : 10 + (int)Math.Round((transferPercent.Value / 100d) * 60);
                     long? transferredBytes = null;
                     if (remoteTotalBytes.HasValue)
                     {
@@ -398,8 +424,8 @@ public sealed class BackupService
                     {
                         ServerName = server.Name,
                         Status = "Running",
-                        ProgressPercent = Math.Clamp(mapped, 10, 70),
-                        Message = "Transferring data",
+                        ProgressPercent = configOnly ? Math.Clamp(mapped, 60, 95) : Math.Clamp(mapped, 10, 70),
+                        Message = configOnly ? "Downloading config" : "Transferring data",
                         TransferredBytes = transferredBytes,
                         TotalBytes = remoteTotalBytes
                     });
@@ -419,7 +445,7 @@ public sealed class BackupService
 
             while (!process.WaitForExit(250))
             {
-                if (remoteTotalBytes.HasValue && remoteTotalBytes.Value > 0)
+                if (!configOnly && remoteTotalBytes.HasValue && remoteTotalBytes.Value > 0)
                 {
                     var downloadedBytes = GetDirectorySizeBytes(dataFolder);
                     var normalized = Math.Clamp(downloadedBytes / (double)remoteTotalBytes.Value, 0d, 1d);
