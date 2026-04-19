@@ -44,12 +44,81 @@
                     <TextBlock Text="!" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" />
                 </Border>
 
-                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                <Grid Grid.Column="1" Margin="12,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
                     <TextBlock FontSize="20" FontWeight="SemiBold" Text="{Binding DialogTitle, RelativeSource={RelativeSource AncestorType=Window}}" />
-                    <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Text="{Binding DialogMessage, RelativeSource={RelativeSource AncestorType=Window}}" />
-                </StackPanel>
+                    <TextBlock Grid.Row="1"
+                               Margin="0,10,0,0"
+                               Text="{Binding DialogMessage, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
+                               TextWrapping="Wrap">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding UseMultilineMessage, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBox Grid.Row="1"
+                             Margin="0,10,0,0"
+                             Text="{Binding DialogMessage, RelativeSource={RelativeSource AncestorType=Window}, Mode=OneWay}"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas"
+                             Background="#0B1220"
+                             BorderBrush="#334155"
+                             Foreground="#E2E8F0"
+                             Padding="10"
+                             MinHeight="220">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding UseMultilineMessage, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                </Grid>
 
-                <Button Grid.Row="2" Grid.ColumnSpan="2" Margin="0,22,0,0" HorizontalAlignment="Right" Click="OkButton_OnClick" Content="OK" />
+                <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,22,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Background="#0369A1" Click="CopyButton_OnClick" Content="Copy">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowCopyButton, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Background="#475569" Click="SecondaryButton_OnClick" Content="{Binding SecondaryButtonText, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowSecondaryButton, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Click="PrimaryButton_OnClick" Content="{Binding PrimaryButtonText, RelativeSource={RelativeSource AncestorType=Window}}" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

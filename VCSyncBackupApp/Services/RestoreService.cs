@@ -15,10 +15,17 @@ public sealed class RestoreService
         var newDataPath = $"{destination}new-data";
         var oldDataPath = $"{destination}old-data";
         var dataZipPath = $"{destination}data.zip";
+        var remoteConfigPath = $"{destination}shadowbox_config.json";
 
         var passphraseValue = maskSensitiveValues
             ? "********"
             : EscapeWinScpArg(request.Passphrase);
+        var configFilePath = string.IsNullOrWhiteSpace(request.ConfigFilePath)
+            ? "<config-file-path-required>"
+            : EscapeWinScpArg(request.ConfigFilePath.Trim());
+        var dataZipFilePath = string.IsNullOrWhiteSpace(request.DataZipFilePath)
+            ? "<data-zip-path-required>"
+            : EscapeWinScpArg(request.DataZipFilePath.Trim());
 
         if (request.ConfigOnly)
         {
@@ -28,7 +35,7 @@ public sealed class RestoreService
                 "option confirm off",
                 $"open sftp://root@{EscapeWinScpArg(request.ServerIpAddress)}/ -privatekey=\"{EscapeWinScpArg(request.PrivateKeyPath)}\" -passphrase=\"{passphraseValue}\" -hostkey=\"*\"",
                 "echo ==== Upload configuration only ====",
-                $"put -resume -rawtransfersettings PreserveTimeDirs=0 \"{EscapeWinScpArg(request.ConfigFilePath)}\" \"{destination}\"",
+                $"put -resume \"{configFilePath}\" \"{remoteConfigPath}\"",
                 "echo ==== Restart shadowbox ====",
                 "call docker restart shadowbox",
                 "echo ==== Config-only restore completed ====",
@@ -48,10 +55,9 @@ public sealed class RestoreService
             $"call mkdir -p \"{prometheusDataPath}\" \"{newDataPath}\" \"{oldDataPath}\"",
             $"call sh -c 'if [ -d \"{prometheusDataPath}\" ]; then cp -r \"{prometheusDataPath}/.\" \"{oldDataPath}/\"; fi'",
             "echo ==== Upload config and data zip ====",
-            $"put -resume -rawtransfersettings PreserveTimeDirs=0 \"{EscapeWinScpArg(request.ConfigFilePath)}\" \"{destination}\"",
-            $"put -resume -rawtransfersettings PreserveTimeDirs=0 \"{EscapeWinScpArg(request.DataZipFilePath)}\" \"{destination}\"",
-            "echo ==== Rename and extract backup data ====",
-            $"call sh -c 'mv {destination}data*.zip {dataZipPath}'",
+            $"put -resume \"{configFilePath}\" \"{remoteConfigPath}\"",
+            $"put -resume \"{dataZipFilePath}\" \"{dataZipPath}\"",
+            "echo ==== Extract backup data ====",
             $"call unzip -o \"{dataZipPath}\" -d \"{newDataPath}/\"",
             "echo ==== Remove old 01* data folders ====",
             $"call sh -c 'rm -rf {prometheusDataPath}/01*'",
@@ -70,6 +76,8 @@ public sealed class RestoreService
         IProgress<string>? terminalOutput,
         CancellationToken cancellationToken)
     {
+        ValidateLocalRestoreFiles(request);
+
         var cliPath = ResolveWinScpCliPath(request.WinScpAssemblyPath);
         var scriptPath = Path.Combine(Path.GetTempPath(), $"winscp_restore_{Guid.NewGuid():N}.txt");
 
@@ -136,28 +144,28 @@ public sealed class RestoreService
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        while (!process.WaitForExit(250))
+        try
         {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                continue;
-            }
-
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
             try
             {
-                process.Kill(true);
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                }
             }
             catch
             {
                 // Ignore kill failures if process already exited.
             }
 
-            throw new OperationCanceledException(cancellationToken);
+            throw;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        await process.WaitForExitAsync(cancellationToken);
+        process.WaitForExit();
 
         if (process.ExitCode == 0)
         {
@@ -226,5 +234,33 @@ public sealed class RestoreService
     private static string EscapeWinScpArg(string value)
     {
         return value.Replace("\"", "\"\"");
+    }
+
+    private static void ValidateLocalRestoreFiles(RestoreRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ConfigFilePath))
+        {
+            throw new InvalidOperationException("Configuration JSON file path is required for restore.");
+        }
+
+        if (!File.Exists(request.ConfigFilePath))
+        {
+            throw new FileNotFoundException("Configuration JSON file was not found.", request.ConfigFilePath);
+        }
+
+        if (request.ConfigOnly)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.DataZipFilePath))
+        {
+            throw new InvalidOperationException("Data zip file path is required when config-only restore is disabled.");
+        }
+
+        if (!File.Exists(request.DataZipFilePath))
+        {
+            throw new FileNotFoundException("Data zip file was not found.", request.DataZipFilePath);
+        }
     }
 }

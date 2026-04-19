@@ -8,6 +8,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private bool _pauseAutoScroll;
+    private bool _isSynchronizingPassphrase;
 
     public MainWindow()
     {
@@ -22,11 +23,46 @@ public partial class MainWindow : Window
         _viewModel.SetOwnerWindow(this);
         await _viewModel.InitializeAsync();
         PassphraseBox.Password = _viewModel.Passphrase;
+        RestorePassphraseBox.Password = _viewModel.Passphrase;
     }
 
     private void PassphraseBox_OnPasswordChanged(object sender, RoutedEventArgs e)
     {
-        _viewModel.Passphrase = PassphraseBox.Password;
+        SyncPassphraseFrom(PassphraseBox);
+    }
+
+    private void RestorePassphraseBox_OnPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        SyncPassphraseFrom(RestorePassphraseBox);
+    }
+
+    private void SyncPassphraseFrom(PasswordBox source)
+    {
+        if (_isSynchronizingPassphrase)
+        {
+            return;
+        }
+
+        try
+        {
+            _isSynchronizingPassphrase = true;
+            var passphrase = source.Password;
+            _viewModel.Passphrase = passphrase;
+
+            if (!ReferenceEquals(source, PassphraseBox) && PassphraseBox.Password != passphrase)
+            {
+                PassphraseBox.Password = passphrase;
+            }
+
+            if (!ReferenceEquals(source, RestorePassphraseBox) && RestorePassphraseBox.Password != passphrase)
+            {
+                RestorePassphraseBox.Password = passphrase;
+            }
+        }
+        finally
+        {
+            _isSynchronizingPassphrase = false;
+        }
     }
 
     private void AddServerButton_OnClick(object sender, RoutedEventArgs e)
@@ -45,6 +81,11 @@ public partial class MainWindow : Window
     public void ShowThemedDialog(string title, string message)
     {
         ThemedDialog.Show(this, title, message);
+    }
+
+    public bool ShowThemedConfirmation(string title, string message)
+    {
+        return ThemedDialog.ShowConfirmation(this, title, message);
     }
 
     private void AboutButton_OnClick(object sender, RoutedEventArgs e)

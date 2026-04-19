@@ -747,13 +747,11 @@ public sealed class MainViewModel : ObservableObject
                 return;
             }
 
-            var restoreConfirm = WpfMessageBox.Show(
-                BuildRestoreRiskChecklist(),
+            var restoreConfirmed = ShowThemedConfirmation(
                 "Confirm Restore Execution",
-                WpfMessageBoxButton.YesNo,
-                WpfMessageBoxImage.Warning);
+                BuildRestoreRiskChecklist());
 
-            if (restoreConfirm != MessageBoxResult.Yes)
+            if (!restoreConfirmed)
             {
                 RestoreSessionStatus = "Cancelled";
                 AppendRestoreTerminalLine("Restore execution cancelled from confirmation dialog.");
@@ -907,6 +905,16 @@ public sealed class MainViewModel : ObservableObject
         ThemedDialog.Show(title, message);
     }
 
+    private bool ShowThemedConfirmation(string title, string message)
+    {
+        if (_ownerWindow is MainWindow mainWindow)
+        {
+            return mainWindow.ShowThemedConfirmation(title, message);
+        }
+
+        return ThemedDialog.ShowConfirmation(title, message);
+    }
+
     private bool ValidateSettings()
     {
         if (Servers.Count == 0)
@@ -991,15 +999,15 @@ public sealed class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(PrivateKeyPath) || (requireExistingFiles && !File.Exists(PrivateKeyPath)))
         {
             var message = requireExistingFiles
-                ? "Set a valid private key (.ppk) path in Configuration."
-                : "Enter private key (.ppk) path in Configuration for preview.";
+                ? "Set a valid private key (.ppk) path on Restore page."
+                : "Enter private key (.ppk) path on Restore page for preview.";
             WpfMessageBox.Show(message, "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(Passphrase))
         {
-            WpfMessageBox.Show("Enter private key passphrase in Configuration.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            WpfMessageBox.Show("Enter private key passphrase on Restore page.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
             return false;
         }
 
