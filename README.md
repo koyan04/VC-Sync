@@ -6,7 +6,7 @@ Windows desktop backup tool for Outline VPN servers with WinSCP .NET automation,
 
 - Installer page (GitHub Pages): https://koyan04.github.io/VC-Sync/
 - Latest release: https://github.com/koyan04/VC-Sync/releases/latest
-- Direct installer (v2.0.0): https://github.com/koyan04/VC-Sync/releases/download/v2.0.0/VC-Sync-Setup-2.0.0.exe
+- Direct installer (v2.0.1): https://github.com/koyan04/VC-Sync/releases/download/v2.0.1/VC-Sync-Setup-2.0.1.exe
 
 ## Features
 

@@ -92,7 +92,7 @@ public partial class MainWindow : Window
     {
         ShowThemedDialog(
             "About VC Sync",
-            "Owner: VChannel\nDeveloper: @sir_yan\nApp Name: VC Sync\nVersion: 2.0.0");
+            "Owner: VChannel\nDeveloper: @sir_yan\nApp Name: VC Sync\nVersion: 2.0.1");
     }
 
     private void LogTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
