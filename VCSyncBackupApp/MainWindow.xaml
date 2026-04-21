@@ -583,7 +583,7 @@
                                     <TextBlock Foreground="#E2E8F0" FontWeight="SemiBold" Text="{Binding RestoreDestinationPath, StringFormat=Selected path: {0}}" />
                                 </Border>
 
-                                <TextBlock Margin="0,16,0,0" Foreground="{StaticResource MutedTextBrush}" Text="The restore process runs server commands in sequence: install unzip, backup old data, upload files, extract, replace 01* folders, and restart shadowbox." TextWrapping="Wrap" />
+                                <TextBlock Margin="0,16,0,0" Foreground="{StaticResource MutedTextBrush}" Text="The restore process runs server commands in sequence: install unzip, stop shadowbox, backup old data, upload files, extract and replace data, and start shadowbox. Use Tune Server once to configure swap and BBR tuning." TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Grid Grid.Row="8" Margin="0,14,0,0">
@@ -595,6 +595,12 @@
                                 <TextBlock VerticalAlignment="Center" Foreground="{StaticResource MutedTextBrush}" Text="{Binding RestoreSessionStatus, StringFormat=Session Status: {0}}" />
 
                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button MinWidth="120" Background="#0EA5A0" Command="{Binding ApplyServerTuningCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE9D9;" Margin="0,0,6,0" />
+                                            <TextBlock Foreground="White" Text="Tune Server" />
+                                        </StackPanel>
+                                    </Button>
                                     <Button MinWidth="120" Background="#0369A1" Command="{Binding RefreshRestorePreviewCommand}">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE70F;" Margin="0,0,6,0" />

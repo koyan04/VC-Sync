@@ -2,13 +2,13 @@
 [Setup]
 AppId={{4A7E3B5D-1E1A-45F0-99AC-B4F4F8B0A9B3}
 AppName=VC Sync
-AppVersion=2.0.1
+AppVersion=2.0.2
 AppPublisher=VChannel
 DefaultDirName={autopf}\VC Sync
 DefaultGroupName=VC Sync
 DisableProgramGroupPage=yes
 OutputDir=..\installer\dist
-OutputBaseFilename=VC-Sync-Setup-2.0.1
+OutputBaseFilename=VC-Sync-Setup-2.0.2
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

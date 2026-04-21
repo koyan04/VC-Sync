@@ -90,6 +90,7 @@ public sealed class MainViewModel : ObservableObject
         BrowseRestoreDataZipCommand = new RelayCommand(BrowseRestoreDataZip, () => !IsBusy);
         BrowseRestoreConfigCommand = new RelayCommand(BrowseRestoreConfig, () => !IsBusy);
         RefreshRestorePreviewCommand = new RelayCommand(() => RefreshRestorePreview(showHint: true), () => !IsRestoreRunning);
+        ApplyServerTuningCommand = new AsyncRelayCommand(StartServerHardeningAsync, () => !IsBusy && !IsRestoreRunning);
         StartRestoreCommand = new AsyncRelayCommand(StartRestoreAsync, () => !IsBusy && !IsRestoreRunning);
         AbortRestoreCommand = new RelayCommand(AbortRestore, () => IsRestoreRunning);
         EndRestoreSessionCommand = new RelayCommand(EndRestoreSession, () => !IsRestoreRunning && !string.IsNullOrWhiteSpace(RestoreTerminalText));
@@ -355,6 +356,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand BrowseRestoreDataZipCommand { get; }
     public RelayCommand BrowseRestoreConfigCommand { get; }
     public RelayCommand RefreshRestorePreviewCommand { get; }
+    public AsyncRelayCommand ApplyServerTuningCommand { get; }
     public AsyncRelayCommand StartRestoreCommand { get; }
     public RelayCommand AbortRestoreCommand { get; }
     public RelayCommand EndRestoreSessionCommand { get; }
@@ -805,6 +807,80 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task StartServerHardeningAsync()
+    {
+        if (!ValidateServerHardeningSettings())
+        {
+            return;
+        }
+
+        await SaveSettingsAsync();
+
+        try
+        {
+            IsBusy = true;
+
+            var request = CreateRestoreRequest();
+            RestoreCommandPreview = string.Join(Environment.NewLine, _restoreService.BuildServerHardeningScriptLines(request, maskSensitiveValues: true));
+
+            var confirmed = ShowThemedConfirmation(
+                "Confirm Server Tuning",
+                BuildServerHardeningChecklist());
+
+            if (!confirmed)
+            {
+                RestoreSessionStatus = "Cancelled";
+                AppendRestoreTerminalLine("Server tuning cancelled from confirmation dialog.");
+                return;
+            }
+
+            IsRestoreRunning = true;
+            RestoreSessionStatus = "Hardening";
+            RestoreTerminalText = string.Empty;
+            _restoreCts = new CancellationTokenSource();
+
+            AppendRestoreTerminalLine("Server tuning started.");
+
+            var terminalOutput = new Progress<string>(line =>
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    return;
+                }
+
+                AppendRestoreTerminalLine(line.Trim());
+            });
+
+            await _restoreService.RunServerHardeningAsync(request, terminalOutput, _restoreCts.Token);
+
+            RestoreSessionStatus = "Hardened";
+            AppendRestoreTerminalLine("Server tuning completed successfully.");
+            SystemSounds.Asterisk.Play();
+            ShowThemedNotification("Server Tuning Completed", "Swap and BBR tuning were applied successfully.");
+        }
+        catch (OperationCanceledException)
+        {
+            RestoreSessionStatus = "Aborted";
+            AppendRestoreTerminalLine("Server tuning aborted by user.");
+            SystemSounds.Exclamation.Play();
+            ShowThemedNotification("Server Tuning Aborted", "Server tuning process was aborted.");
+        }
+        catch (Exception ex)
+        {
+            RestoreSessionStatus = "Failed";
+            AppendRestoreTerminalLine($"Server tuning failed: {ex.Message}");
+            SystemSounds.Hand.Play();
+            ShowThemedNotification("Server Tuning Failed", ex.Message);
+        }
+        finally
+        {
+            _restoreCts?.Dispose();
+            _restoreCts = null;
+            IsRestoreRunning = false;
+            IsBusy = false;
+        }
+    }
+
     private void StopBackup()
     {
         _backupCts?.Cancel();
@@ -878,12 +954,25 @@ public sealed class MainViewModel : ObservableObject
             "This will execute restore actions on the target server:",
             "",
             "1. Install unzip package.",
-            "2. Upload and overwrite backup config/json and data zip in destination path.",
-            "3. Remove existing prometheus data folders starting with 01*.",
-            "4. Copy restored data into prometheus/data.",
-            "5. Restart docker container: shadowbox.",
+            "2. Stop docker container: shadowbox.",
+            "3. Upload and overwrite backup config/json and data zip in destination path.",
+            "4. Remove old prometheus block/runtime files and copy restored data.",
+            "5. Start docker container: shadowbox.",
             "",
             "Continue with live restore execution?");
+    }
+
+    private static string BuildServerHardeningChecklist()
+    {
+        return string.Join(Environment.NewLine,
+            "This will execute one-time server tuning actions:",
+            "",
+            "1. Create and enable 2GB /swapfile if missing.",
+            "2. Persist swap in /etc/fstab.",
+            "3. Set vm.swappiness=10.",
+            "4. Enable BBR settings in /etc/sysctl.conf.",
+            "",
+            "Continue with server tuning?");
     }
 
     private void AppendRestoreTerminalLine(string line)
@@ -1014,6 +1103,35 @@ public sealed class MainViewModel : ObservableObject
         if (!RestoreDestinationOptions.Contains(RestoreDestinationPath))
         {
             RestoreDestinationPath = RootRestorePath;
+        }
+
+        return true;
+    }
+
+    private bool ValidateServerHardeningSettings()
+    {
+        if (string.IsNullOrWhiteSpace(RestoreServerIpAddress))
+        {
+            WpfMessageBox.Show("Enter target server IP address.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(WinScpAssemblyPath) || !File.Exists(WinScpAssemblyPath))
+        {
+            WpfMessageBox.Show("Set a valid WinSCPnet.dll path in Configuration.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(PrivateKeyPath) || !File.Exists(PrivateKeyPath))
+        {
+            WpfMessageBox.Show("Set a valid private key (.ppk) path on Restore page.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(Passphrase))
+        {
+            WpfMessageBox.Show("Enter private key passphrase on Restore page.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            return false;
         }
 
         return true;
@@ -1254,6 +1372,7 @@ public sealed class MainViewModel : ObservableObject
         BrowseRestoreDataZipCommand.RaiseCanExecuteChanged();
         BrowseRestoreConfigCommand.RaiseCanExecuteChanged();
         RefreshRestorePreviewCommand.RaiseCanExecuteChanged();
+        ApplyServerTuningCommand.RaiseCanExecuteChanged();
         StartRestoreCommand.RaiseCanExecuteChanged();
         AbortRestoreCommand.RaiseCanExecuteChanged();
         EndRestoreSessionCommand.RaiseCanExecuteChanged();
