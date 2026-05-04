@@ -1,0 +1,53 @@
+name: Build Inno Setup Installer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'installer/VC-Sync-Setup.iss'
+      - 'VCSyncBackupApp/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Build Release
+      run: |
+        cd VCSyncBackupApp
+        dotnet publish -c Release -o ../publish/win-x64
+        cd ..
+    
+    - name: Setup Inno Setup
+      uses: thorsten/inno-setup-action@v1
+    
+    - name: Compile Installer
+      run: |
+        iscc /O"installer\dist" "installer\VC-Sync-Setup.iss"
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          installer/dist/VC-Sync-Setup-*.exe
+          installer/VC-Sync-2.1.0-Installer.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload Artifacts
+      if: '!startsWith(github.ref, ''refs/tags/'')'
+      uses: actions/upload-artifact@v3
+      with:
+        name: VC-Sync-Installer
+        path: installer/dist/VC-Sync-Setup-*.exe
