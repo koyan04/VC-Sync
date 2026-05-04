@@ -94,7 +94,7 @@
                         <TextBlock Margin="0,6,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Choose a workflow to back up or restore your server state." />
                     </StackPanel>
 
-                    <UniformGrid Grid.Row="2" Margin="0,30,0,20" Columns="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <UniformGrid Grid.Row="2" Margin="0,30,0,20" Columns="3" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Border Margin="10" Padding="20" Width="360" CornerRadius="14" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
                             <StackPanel>
                                 <TextBlock FontSize="22" FontWeight="SemiBold" Text="Backup Servers" />
@@ -108,6 +108,14 @@
                                 <TextBlock FontSize="22" FontWeight="SemiBold" Text="Restore Server" />
                                 <TextBlock Margin="0,8,0,16" Foreground="{StaticResource MutedTextBrush}" Text="Upload backup zip and config json, then run guided server restore." TextWrapping="Wrap" />
                                 <Button MinHeight="44" Background="#0F766E" Command="{Binding NavigateRestorePageCommand}" Content="Open Restore Page" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="10" Padding="20" Width="360" CornerRadius="14" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
+                            <StackPanel>
+                                <TextBlock FontSize="22" FontWeight="SemiBold" Text="Server API Keys" />
+                                <TextBlock Margin="0,8,0,16" Foreground="{StaticResource MutedTextBrush}" Text="Download access.txt, convert it to API key JSON, and manage saved key files." TextWrapping="Wrap" />
+                                <Button MinHeight="44" Background="#1D4ED8" Command="{Binding NavigateApiKeysPageCommand}" Content="Open API Keys Page" />
                             </StackPanel>
                         </Border>
                     </UniformGrid>
@@ -156,6 +164,14 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE898;" Margin="0,0,6,0" />
                                         <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Only config backup (skip data archive)" />
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox Margin="0,6,0,0"
+                                          IsChecked="{Binding BackupServerConfigOnly}"
+                                          ToolTip="Download shadowbox_server_config.json only">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE8A5;" Margin="0,0,6,0" />
+                                        <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Server Config Only" />
                                     </StackPanel>
                                 </CheckBox>
                             </StackPanel>
@@ -410,8 +426,7 @@
                                 <Button Grid.Column="1"
                                         Margin="8,0,0,0"
                                         ToolTip="Paste IP address"
-                                        Command="ApplicationCommands.Paste"
-                                        CommandTarget="{Binding ElementName=RestoreServerIpTextBox}">
+                                        Command="{Binding ClearPasteRestoreServerIpCommand}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE77F;" Margin="0,0,6,0" />
                                         <TextBlock Foreground="White" Text="Paste" />
@@ -575,10 +590,61 @@
                                                           ToolTip="Upload config and restart shadowbox only">
                                                     <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Config Only" />
                                                 </CheckBox>
+
+                                                <CheckBox Margin="14,0,0,0"
+                                                          IsChecked="{Binding RestoreServerConfigOnly}"
+                                                          ToolTip="Upload shadowbox_server_config.json and restart shadowbox only">
+                                                    <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Server Config Only" />
+                                                </CheckBox>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
+                                <Border Margin="0,6,0,0"
+                                        Padding="8,5"
+                                        CornerRadius="6"
+                                        Background="#0B1220"
+                                        BorderBrush="#1E293B"
+                                        BorderThickness="1"
+                                        Visibility="{Binding RestoreConfigOnly, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Margin="0,0,0,4" Text="Configuration File Location" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding RestoreConfigFilePath, UpdateSourceTrigger=PropertyChanged}" />
+                                            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding BrowseRestoreConfigCommand}" Content="Browse" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Margin="0,6,0,0"
+                                        Padding="8,5"
+                                        CornerRadius="6"
+                                        Background="#0B1220"
+                                        BorderBrush="#1E293B"
+                                        BorderThickness="1"
+                                        Visibility="{Binding RestoreServerConfigOnly, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Margin="0,0,0,4" Text="Server Config File Location" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding RestoreServerConfigFilePath, UpdateSourceTrigger=PropertyChanged}" />
+                                            <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding BrowseRestoreServerConfigCommand}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE838;" Margin="0,0,6,0" />
+                                                    <TextBlock Foreground="White" Text="Browse" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Margin="0,6,0,0" Padding="8,5" CornerRadius="6" Background="#0B1220" BorderBrush="#1E293B" BorderThickness="1">
                                     <TextBlock Foreground="#E2E8F0" FontWeight="SemiBold" Text="{Binding RestoreDestinationPath, StringFormat=Selected path: {0}}" />
                                 </Border>
@@ -670,6 +736,179 @@
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <Grid Visibility="{Binding IsApiKeysPage, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Button HorizontalAlignment="Left" VerticalAlignment="Top" MinWidth="120" Command="{Binding NavigateHomeCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE80F;" Margin="0,0,6,0" />
+                        <TextBlock Foreground="White" Text="Main Page" />
+                    </StackPanel>
+                </Button>
+
+                <Grid Margin="0,44,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.15*" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="18" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#111827">
+                        <StackPanel>
+                            <TextBlock FontSize="26" FontWeight="Bold" Text="Server API Keys" />
+                            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource MutedTextBrush}" Text="Download access.txt from the selected source path, generate API key JSON, and store it locally." />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="0" Margin="0,14,10,0" Padding="16" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource PanelBrush}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Generate API Key" />
+
+                                <TextBlock Margin="0,14,0,4" Text="Server Name" />
+                                <TextBox Text="{Binding ApiKeyServerName, UpdateSourceTrigger=PropertyChanged}" />
+
+                                <TextBlock Margin="0,12,0,4" Text="Server IP Address" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding ApiKeyServerIpAddress, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding ClearPasteApiKeyServerIpCommand}" ToolTip="Clear field and paste from clipboard">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource GlyphOnButtonStyle}" Text="&#xE77F;" Margin="0,0,6,0" />
+                                            <TextBlock Foreground="White" Text="Clear &amp; Paste" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+
+                                <Grid Margin="0,12,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Private Key File Location" />
+                                    <TextBlock Grid.Column="1" Margin="10,0,0,0" Text="Private Key Passphrase" />
+                                </Grid>
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding PrivateKeyPath, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="1" Margin="8,0,8,0" Command="{Binding BrowseKeyCommand}" Content="Browse" />
+                                    <PasswordBox Grid.Column="2"
+                                                 Name="ApiKeyPassphraseBox"
+                                                 PasswordChanged="PassphraseBox_OnPasswordChanged"
+                                                 Background="#1F2937"
+                                                 Foreground="{StaticResource TextBrush}"
+                                                 BorderBrush="{StaticResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 Padding="8,6" />
+                                </Grid>
+
+                                <TextBlock Margin="0,12,0,4" Text="Source Location" />
+                                <Border Padding="8,6" CornerRadius="6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#0B1220">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                                            <RadioButton GroupName="ApiKeySourceGroup" IsChecked="{Binding IsApiKeyRootSourceSelected}" Margin="0,0,16,0">
+                                                <TextBlock Foreground="{StaticResource TextBrush}" Text="/root/shadowbox/ (Default)" />
+                                            </RadioButton>
+                                            <RadioButton GroupName="ApiKeySourceGroup" IsChecked="{Binding IsApiKeyOutlineSourceSelected}">
+                                                <TextBlock Foreground="{StaticResource TextBrush}" Text="/opt/outline/" />
+                                            </RadioButton>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Margin="0,12,0,4" Text="Destination Folder" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding ApiKeyDestinationFolder, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding BrowseApiKeyDestinationCommand}" Content="Browse" />
+                                </Grid>
+
+                                <TextBlock Margin="0,12,0,4" Text="API Key" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Height="75"
+                                             Text="{Binding ApiKeyValue, UpdateSourceTrigger=PropertyChanged}"
+                                             AcceptsReturn="True"
+                                             VerticalScrollBarVisibility="Auto"
+                                             TextWrapping="Wrap"
+                                             FontFamily="Consolas"
+                                             Background="#020617"
+                                             BorderBrush="{StaticResource BorderBrush}" />
+                                    <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding CopyApiKeyCommand}" Content="Copy" />
+                                </Grid>
+
+                                <StackPanel Margin="0,16,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button MinWidth="130" Background="#0F766E" Command="{Binding GenerateApiKeyCommand}" Content="Generate" />
+                                    <Button MinWidth="130" Command="{Binding SaveApiKeyCommand}" Content="Save" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="1" Margin="10,14,0,0" Padding="16" CornerRadius="12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#020617">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphMutedStyle}" Text="&#xE8D4;" Margin="0,0,6,0" />
+                                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Saved API Keys" />
+                            </StackPanel>
+
+                            <DataGrid Grid.Row="1"
+                                      Margin="0,10,0,0"
+                                      ItemsSource="{Binding ApiKeyFiles}"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      IsReadOnly="True"
+                                      HeadersVisibility="Column"
+                                      ColumnHeaderHeight="34"
+                                      RowBackground="#0B1220"
+                                      AlternatingRowBackground="#111827"
+                                      Background="#0B1220"
+                                      Foreground="{StaticResource TextBrush}"
+                                      BorderBrush="{StaticResource BorderBrush}"
+                                      GridLinesVisibility="Horizontal">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="1.2*" />
+                                    <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" Width="0.9*" />
+                                    <DataGridTextColumn Header="Created Date" Binding="{Binding CreatedDate, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="1.1*" />
+                                    <DataGridTemplateColumn Header="Action" Width="1.5*">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Width="72" Height="30" Margin="0,0,6,0" Background="#0369A1" Command="{Binding DataContext.ViewApiKeyCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Content="View" />
+                                                    <Button Width="72" Height="30" Background="#B91C1C" Command="{Binding DataContext.DeleteApiKeyCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Content="Delete" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
                         </Grid>
                     </Border>
                 </Grid>

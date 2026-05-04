@@ -19,6 +19,10 @@ public sealed class RestoreService
             ? "shadowbox_config.json"
             : Path.GetFileName(request.ConfigFilePath.Trim());
         var remoteConfigPath = $"{destination}{EscapeWinScpArg(configFileName)}";
+        var serverConfigPath = string.IsNullOrWhiteSpace(request.ServerConfigFilePath)
+            ? string.Empty
+            : EscapeWinScpArg(request.ServerConfigFilePath.Trim());
+        var remoteServerConfigPath = $"{destination}shadowbox_server_config.json";
 
         var passphraseValue = maskSensitiveValues
             ? "********"
@@ -26,9 +30,49 @@ public sealed class RestoreService
         var configFilePath = string.IsNullOrWhiteSpace(request.ConfigFilePath)
             ? "<config-file-path-required>"
             : EscapeWinScpArg(request.ConfigFilePath.Trim());
+        var serverConfigFilePath = string.IsNullOrWhiteSpace(request.ServerConfigFilePath)
+            ? "<server-config-file-path-required>"
+            : serverConfigPath;
         var dataZipFilePath = string.IsNullOrWhiteSpace(request.DataZipFilePath)
             ? "<data-zip-path-required>"
             : EscapeWinScpArg(request.DataZipFilePath.Trim());
+
+        if (request.ServerConfigOnly && request.ConfigOnly)
+        {
+            return new[]
+            {
+                "option batch abort",
+                "option confirm off",
+                $"open sftp://root@{EscapeWinScpArg(request.ServerIpAddress)}/ -privatekey=\"{EscapeWinScpArg(request.PrivateKeyPath)}\" -passphrase=\"{passphraseValue}\" -hostkey=\"*\"",
+                "echo ==== Upload config and server config only ====",
+                $"call rm -f \"{remoteConfigPath}\" \"{remoteServerConfigPath}\"",
+                $"put \"{configFilePath}\" \"{remoteConfigPath}\"",
+                $"put \"{serverConfigFilePath}\" \"{remoteServerConfigPath}\"",
+                "echo ==== Restart shadowbox ====",
+                "call sh -c 'docker stop shadowbox >/dev/null 2>&1 || true'",
+                "call docker start shadowbox",
+                "echo ==== Combined config restore completed ====",
+                "exit"
+            };
+        }
+
+        if (request.ServerConfigOnly)
+        {
+            return new[]
+            {
+                "option batch abort",
+                "option confirm off",
+                $"open sftp://root@{EscapeWinScpArg(request.ServerIpAddress)}/ -privatekey=\"{EscapeWinScpArg(request.PrivateKeyPath)}\" -passphrase=\"{passphraseValue}\" -hostkey=\"*\"",
+                "echo ==== Upload server config only ====",
+                $"call rm -f \"{remoteServerConfigPath}\"",
+                $"put \"{serverConfigFilePath}\" \"{remoteServerConfigPath}\"",
+                "echo ==== Restart shadowbox ====",
+                "call sh -c 'docker stop shadowbox >/dev/null 2>&1 || true'",
+                "call docker start shadowbox",
+                "echo ==== Server-config-only restore completed ====",
+                "exit"
+            };
+        }
 
         if (request.ConfigOnly)
         {
@@ -306,6 +350,46 @@ public sealed class RestoreService
 
     private static void ValidateLocalRestoreFiles(RestoreRequest request)
     {
+        if (request.ServerConfigOnly && request.ConfigOnly)
+        {
+            if (string.IsNullOrWhiteSpace(request.ConfigFilePath))
+            {
+                throw new InvalidOperationException("Configuration JSON file path is required for combined config restore.");
+            }
+
+            if (!File.Exists(request.ConfigFilePath))
+            {
+                throw new FileNotFoundException("Configuration JSON file was not found.", request.ConfigFilePath);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.ServerConfigFilePath))
+            {
+                throw new InvalidOperationException("Server configuration file path is required for combined config restore.");
+            }
+
+            if (!File.Exists(request.ServerConfigFilePath))
+            {
+                throw new FileNotFoundException("Server configuration file was not found.", request.ServerConfigFilePath);
+            }
+
+            return;
+        }
+
+        if (request.ServerConfigOnly)
+        {
+            if (string.IsNullOrWhiteSpace(request.ServerConfigFilePath))
+            {
+                throw new InvalidOperationException("Server configuration file path is required for server-config-only restore.");
+            }
+
+            if (!File.Exists(request.ServerConfigFilePath))
+            {
+                throw new FileNotFoundException("Server configuration file was not found.", request.ServerConfigFilePath);
+            }
+
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(request.ConfigFilePath))
         {
             throw new InvalidOperationException("Configuration JSON file path is required for restore.");

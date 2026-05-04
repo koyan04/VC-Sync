@@ -19,12 +19,16 @@ public sealed class MainViewModel : ObservableObject
 {
     private const string RootRestorePath = "/root/shadowbox/persisted-state/";
     private const string OutlineRestorePath = "/opt/outline/persisted-state/";
+    private const string ApiKeyRootSourcePath = "/root/shadowbox/";
+    private const string ApiKeyOutlineSourcePath = "/opt/outline/";
+    private const string ServerConfigFileName = "shadowbox_server_config.json";
 
     private readonly string _appDataPath;
     private readonly SettingsService _settingsService;
     private readonly SecretStore _secretStore;
     private readonly BackupService _backupService;
     private readonly RestoreService _restoreService;
+    private readonly ApiKeyService _apiKeyService;
     private Window? _ownerWindow;
 
     private ServerConfig? _selectedServer;
@@ -34,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
     private string _baseBackupDirectory = string.Empty;
     private int _retentionCount = 1;
     private bool _backupConfigOnly;
+    private bool _backupServerConfigOnly;
     private string _logText = string.Empty;
     private bool _isBusy;
     private int _overallProgress;
@@ -42,6 +47,7 @@ public sealed class MainViewModel : ObservableObject
     private string _restoreServerIpAddress = string.Empty;
     private string _restoreDataZipFilePath = string.Empty;
     private string _restoreConfigFilePath = string.Empty;
+    private string _restoreServerConfigFilePath = string.Empty;
     private string _restoreDestinationPath = RootRestorePath;
     private bool _isRootRestoreDestinationSelected = true;
     private bool _isOutlineRestoreDestinationSelected;
@@ -52,9 +58,17 @@ public sealed class MainViewModel : ObservableObject
     private bool _isRestoreRunning;
     private bool _isRestoreDryRun = true;
     private bool _restoreConfigOnly;
+    private bool _restoreServerConfigOnly;
     private bool _isHomePage = true;
     private bool _isBackupPage;
     private bool _isRestorePage;
+    private bool _isApiKeysPage;
+    private string _apiKeyServerIpAddress = string.Empty;
+    private string _apiKeyServerName = string.Empty;
+    private string _apiKeyDestinationFolder = string.Empty;
+    private string _apiKeyValue = string.Empty;
+    private bool _isApiKeyRootSourceSelected = true;
+    private bool _isApiKeyOutlineSourceSelected;
 
     public MainViewModel()
     {
@@ -65,6 +79,7 @@ public sealed class MainViewModel : ObservableObject
         _secretStore = new SecretStore(_appDataPath);
         _backupService = new BackupService();
         _restoreService = new RestoreService();
+        _apiKeyService = new ApiKeyService();
 
         Servers = new ObservableCollection<ServerConfig>();
         RestoreDestinationOptions = new ObservableCollection<string>
@@ -89,6 +104,8 @@ public sealed class MainViewModel : ObservableObject
         BrowseBaseDirectoryCommand = new RelayCommand(BrowseBaseDirectory, () => !IsBusy);
         BrowseRestoreDataZipCommand = new RelayCommand(BrowseRestoreDataZip, () => !IsBusy);
         BrowseRestoreConfigCommand = new RelayCommand(BrowseRestoreConfig, () => !IsBusy);
+        BrowseRestoreServerConfigCommand = new RelayCommand(BrowseRestoreServerConfig, () => !IsBusy);
+        ClearPasteRestoreServerIpCommand = new RelayCommand(ClearAndPasteRestoreServerIp, () => !IsBusy);
         RefreshRestorePreviewCommand = new RelayCommand(() => RefreshRestorePreview(showHint: true), () => !IsRestoreRunning);
         ApplyServerTuningCommand = new AsyncRelayCommand(StartServerHardeningAsync, () => !IsBusy && !IsRestoreRunning);
         StartRestoreCommand = new AsyncRelayCommand(StartRestoreAsync, () => !IsBusy && !IsRestoreRunning);
@@ -97,6 +114,14 @@ public sealed class MainViewModel : ObservableObject
         NavigateHomeCommand = new RelayCommand(NavigateHome);
         NavigateBackupPageCommand = new RelayCommand(NavigateBackupPage);
         NavigateRestorePageCommand = new RelayCommand(NavigateRestorePage);
+        NavigateApiKeysPageCommand = new RelayCommand(NavigateApiKeysPage);
+        GenerateApiKeyCommand = new AsyncRelayCommand(GenerateApiKeyAsync, () => !IsBusy);
+        SaveApiKeyCommand = new AsyncRelayCommand(SaveApiKeyAsync, () => !IsBusy);
+        CopyApiKeyCommand = new RelayCommand(CopyApiKeyToClipboard, () => !IsBusy);
+        ClearPasteApiKeyServerIpCommand = new RelayCommand(ClearAndPasteApiKeyServerIp, () => !IsBusy);
+        BrowseApiKeyDestinationCommand = new RelayCommand(BrowseApiKeyDestinationFolder, () => !IsBusy);
+        ViewApiKeyCommand = new RelayCommand(LoadApiKeyEntry, parameter => parameter is ApiKeyFileEntry && !IsBusy);
+        DeleteApiKeyCommand = new RelayCommand(DeleteApiKeyEntry, parameter => parameter is ApiKeyFileEntry && !IsBusy);
     }
 
     public ObservableCollection<ServerConfig> Servers { get; }
@@ -149,6 +174,12 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _backupConfigOnly;
         set => SetProperty(ref _backupConfigOnly, value);
+    }
+
+    public bool BackupServerConfigOnly
+    {
+        get => _backupServerConfigOnly;
+        set => SetProperty(ref _backupServerConfigOnly, value);
     }
 
     public string LogText
@@ -205,6 +236,18 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _restoreConfigFilePath, value))
+            {
+                RefreshRestorePreview();
+            }
+        }
+    }
+
+    public string RestoreServerConfigFilePath
+    {
+        get => _restoreServerConfigFilePath;
+        set
+        {
+            if (SetProperty(ref _restoreServerConfigFilePath, value))
             {
                 RefreshRestorePreview();
             }
@@ -303,7 +346,20 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _restoreConfigOnly, value))
             {
-                IsRestoreDataZipEnabled = !_restoreConfigOnly;
+                IsRestoreDataZipEnabled = !(_restoreConfigOnly || _restoreServerConfigOnly);
+                RefreshRestorePreview();
+            }
+        }
+    }
+
+    public bool RestoreServerConfigOnly
+    {
+        get => _restoreServerConfigOnly;
+        set
+        {
+            if (SetProperty(ref _restoreServerConfigOnly, value))
+            {
+                IsRestoreDataZipEnabled = !(_restoreConfigOnly || _restoreServerConfigOnly);
                 RefreshRestorePreview();
             }
         }
@@ -339,6 +395,70 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _isRestorePage, value);
     }
 
+    public bool IsApiKeysPage
+    {
+        get => _isApiKeysPage;
+        set => SetProperty(ref _isApiKeysPage, value);
+    }
+
+    public string ApiKeyServerIpAddress
+    {
+        get => _apiKeyServerIpAddress;
+        set => SetProperty(ref _apiKeyServerIpAddress, value);
+    }
+
+    public string ApiKeyServerName
+    {
+        get => _apiKeyServerName;
+        set => SetProperty(ref _apiKeyServerName, value);
+    }
+
+    public string ApiKeyDestinationFolder
+    {
+        get => _apiKeyDestinationFolder;
+        set
+        {
+            if (SetProperty(ref _apiKeyDestinationFolder, value))
+            {
+                RefreshApiKeyFiles();
+            }
+        }
+    }
+
+    public string ApiKeyValue
+    {
+        get => _apiKeyValue;
+        set => SetProperty(ref _apiKeyValue, value);
+    }
+
+    public bool IsApiKeyRootSourceSelected
+    {
+        get => _isApiKeyRootSourceSelected;
+        set
+        {
+            if (!SetProperty(ref _isApiKeyRootSourceSelected, value) || !value)
+            {
+                return;
+            }
+
+            SetProperty(ref _isApiKeyOutlineSourceSelected, false, nameof(IsApiKeyOutlineSourceSelected));
+        }
+    }
+
+    public bool IsApiKeyOutlineSourceSelected
+    {
+        get => _isApiKeyOutlineSourceSelected;
+        set
+        {
+            if (!SetProperty(ref _isApiKeyOutlineSourceSelected, value) || !value)
+            {
+                return;
+            }
+
+            SetProperty(ref _isApiKeyRootSourceSelected, false, nameof(IsApiKeyRootSourceSelected));
+        }
+    }
+
     public RelayCommand AddServerCommand { get; }
     public RelayCommand DeleteServerCommand { get; }
     public RelayCommand DeleteAllServersCommand { get; }
@@ -355,6 +475,8 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand BrowseBaseDirectoryCommand { get; }
     public RelayCommand BrowseRestoreDataZipCommand { get; }
     public RelayCommand BrowseRestoreConfigCommand { get; }
+    public RelayCommand BrowseRestoreServerConfigCommand { get; }
+    public RelayCommand ClearPasteRestoreServerIpCommand { get; }
     public RelayCommand RefreshRestorePreviewCommand { get; }
     public AsyncRelayCommand ApplyServerTuningCommand { get; }
     public AsyncRelayCommand StartRestoreCommand { get; }
@@ -363,6 +485,16 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand NavigateHomeCommand { get; }
     public RelayCommand NavigateBackupPageCommand { get; }
     public RelayCommand NavigateRestorePageCommand { get; }
+    public RelayCommand NavigateApiKeysPageCommand { get; }
+    public AsyncRelayCommand GenerateApiKeyCommand { get; }
+    public AsyncRelayCommand SaveApiKeyCommand { get; }
+    public RelayCommand CopyApiKeyCommand { get; }
+    public RelayCommand ClearPasteApiKeyServerIpCommand { get; }
+    public RelayCommand BrowseApiKeyDestinationCommand { get; }
+    public RelayCommand ViewApiKeyCommand { get; }
+    public RelayCommand DeleteApiKeyCommand { get; }
+
+    public ObservableCollection<ApiKeyFileEntry> ApiKeyFiles { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -375,7 +507,9 @@ public sealed class MainViewModel : ObservableObject
             : config.BaseBackupDirectory;
         RetentionCount = config.RetentionCount <= 0 ? 1 : config.RetentionCount;
         BackupConfigOnly = config.BackupConfigOnly;
+        BackupServerConfigOnly = config.BackupServerConfigOnly;
         RestoreConfigOnly = config.RestoreConfigOnly;
+        RestoreServerConfigOnly = config.RestoreServerConfigOnly;
 
         Servers.Clear();
         foreach (var server in config.Servers)
@@ -387,9 +521,20 @@ public sealed class MainViewModel : ObservableObject
         }
 
         Passphrase = await _secretStore.LoadPassphraseAsync();
+        ApiKeyDestinationFolder = config.ApiKeyDestinationFolder;
+        if (string.IsNullOrWhiteSpace(ApiKeyDestinationFolder))
+        {
+            ApiKeyDestinationFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "VChannel", "ApiKeys");
+        }
+
+        SyncApiKeySourceSelectionFlags(string.IsNullOrWhiteSpace(config.ApiKeySourcePath)
+            ? ApiKeyRootSourcePath
+            : config.ApiKeySourcePath);
+
         RestoreDestinationPath = RestoreDestinationOptions.First();
-        SetCurrentPage(home: true, backup: false, restore: false);
+        SetCurrentPage(home: true, backup: false, restore: false, apiKeys: false);
         RefreshRestorePreview();
+        RefreshApiKeyFiles();
         LogText = $"Loaded settings from: {_settingsService.GetConfigPath()}";
         RaiseAllCanExecuteChanges();
     }
@@ -417,24 +562,40 @@ public sealed class MainViewModel : ObservableObject
 
     private void NavigateHome()
     {
-        SetCurrentPage(home: true, backup: false, restore: false);
+        SetCurrentPage(home: true, backup: false, restore: false, apiKeys: false);
     }
 
     private void NavigateBackupPage()
     {
-        SetCurrentPage(home: false, backup: true, restore: false);
+        SetCurrentPage(home: false, backup: true, restore: false, apiKeys: false);
     }
 
     private void NavigateRestorePage()
     {
-        SetCurrentPage(home: false, backup: false, restore: true);
+        SetCurrentPage(home: false, backup: false, restore: true, apiKeys: false);
     }
 
-    private void SetCurrentPage(bool home, bool backup, bool restore)
+    private void NavigateApiKeysPage()
+    {
+        SetCurrentPage(home: false, backup: false, restore: false, apiKeys: true);
+    }
+
+    private void SetCurrentPage(bool home, bool backup, bool restore, bool apiKeys)
     {
         IsHomePage = home;
         IsBackupPage = backup;
         IsRestorePage = restore;
+        IsApiKeysPage = apiKeys;
+    }
+
+    private void SyncApiKeySourceSelectionFlags(string sourcePath)
+    {
+        var normalized = NormalizeRemotePath(sourcePath);
+        var isRoot = string.Equals(normalized, ApiKeyRootSourcePath, StringComparison.Ordinal);
+        var isOutline = string.Equals(normalized, ApiKeyOutlineSourcePath, StringComparison.Ordinal);
+
+        SetProperty(ref _isApiKeyRootSourceSelected, isRoot, nameof(IsApiKeyRootSourceSelected));
+        SetProperty(ref _isApiKeyOutlineSourceSelected, isOutline, nameof(IsApiKeyOutlineSourceSelected));
     }
 
     private void SyncRestoreDestinationSelectionFlags(string destinationPath)
@@ -477,13 +638,11 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        var confirm = WpfMessageBox.Show(
-            "Delete all configured servers?",
+        var confirm = ShowThemedConfirmation(
             "Confirm",
-            WpfMessageBoxButton.YesNo,
-            WpfMessageBoxImage.Warning);
+            "Delete all configured servers?");
 
-        if (confirm != MessageBoxResult.Yes)
+        if (!confirm)
         {
             return;
         }
@@ -511,9 +670,13 @@ public sealed class MainViewModel : ObservableObject
                 WinScpAssemblyPath = WinScpAssemblyPath.Trim(),
                 PrivateKeyPath = PrivateKeyPath.Trim(),
                 BaseBackupDirectory = BaseBackupDirectory.Trim(),
+                ApiKeyDestinationFolder = ApiKeyDestinationFolder.Trim(),
+                ApiKeySourcePath = GetSelectedApiKeySourcePath(),
                 RetentionCount = Math.Max(1, RetentionCount),
                 BackupConfigOnly = BackupConfigOnly,
+                BackupServerConfigOnly = BackupServerConfigOnly,
                 RestoreConfigOnly = RestoreConfigOnly,
+                RestoreServerConfigOnly = RestoreServerConfigOnly,
                 Servers = Servers.ToList()
             };
 
@@ -524,7 +687,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            WpfMessageBox.Show($"Failed to save settings.\n{ex.Message}", "Save Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+            ShowThemedDialog("Save Error", $"Failed to save settings.\n{ex.Message}");
         }
         finally
         {
@@ -546,7 +709,7 @@ public sealed class MainViewModel : ObservableObject
     {
         if (SelectedServer is null)
         {
-            WpfMessageBox.Show("Select a server from Server Management before running single backup.", "No Server Selected", WpfMessageBoxButton.OK, WpfMessageBoxImage.Information);
+            ShowThemedDialog("No Server Selected", "Select a server from Server Management before running single backup.");
             return;
         }
 
@@ -661,6 +824,8 @@ public sealed class MainViewModel : ObservableObject
                         WinScpAssemblyPath = WinScpAssemblyPath,
                         PrivateKeyPath = PrivateKeyPath,
                         BaseBackupDirectory = BaseBackupDirectory,
+                        ApiKeyDestinationFolder = ApiKeyDestinationFolder,
+                        ApiKeySourcePath = GetSelectedApiKeySourcePath(),
                         RetentionCount = RetentionCount,
                         BackupConfigOnly = BackupConfigOnly,
                         RestoreConfigOnly = RestoreConfigOnly,
@@ -674,6 +839,7 @@ public sealed class MainViewModel : ObservableObject
                         logRoot,
                         progress,
                         BackupConfigOnly,
+                        BackupServerConfigOnly,
                         _backupCts.Token);
 
                     sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] {server.Name}: Success");
@@ -912,13 +1078,60 @@ public sealed class MainViewModel : ObservableObject
         {
             ServerIpAddress = RestoreServerIpAddress.Trim(),
             DataZipFilePath = RestoreDataZipFilePath.Trim(),
-            ConfigFilePath = RestoreConfigFilePath.Trim(),
+            ConfigFilePath = ResolveRestoreConfigFilePath(),
+            ServerConfigFilePath = ResolveRestoreServerConfigFilePath(),
             DestinationPath = RestoreDestinationPath.Trim(),
             ConfigOnly = RestoreConfigOnly,
+            ServerConfigOnly = RestoreServerConfigOnly,
             WinScpAssemblyPath = WinScpAssemblyPath.Trim(),
             PrivateKeyPath = PrivateKeyPath.Trim(),
             Passphrase = Passphrase
         };
+    }
+
+    private string ResolveRestoreConfigFilePath()
+    {
+        var configuredPath = RestoreConfigFilePath?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return configuredPath;
+        }
+
+        if (RestoreConfigOnly)
+        {
+            return string.Empty;
+        }
+
+        var dataZipDirectory = Path.GetDirectoryName(RestoreDataZipFilePath?.Trim() ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(dataZipDirectory))
+        {
+            return string.Empty;
+        }
+
+        var preferredConfigPath = Path.Combine(dataZipDirectory, ServerConfigFileName);
+        if (File.Exists(preferredConfigPath))
+        {
+            return preferredConfigPath;
+        }
+
+        var legacyConfigPath = Path.Combine(dataZipDirectory, "shadowbox_config.json");
+        if (File.Exists(legacyConfigPath))
+        {
+            return legacyConfigPath;
+        }
+
+        return preferredConfigPath;
+    }
+
+    private string ResolveRestoreServerConfigFilePath()
+    {
+        var configuredPath = RestoreServerConfigFilePath?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return configuredPath;
+        }
+
+        return string.Empty;
     }
 
     private void RefreshRestorePreview()
@@ -939,12 +1152,34 @@ public sealed class MainViewModel : ObservableObject
 
     private string BuildRestoreRiskChecklist()
     {
+        if (RestoreConfigOnly && RestoreServerConfigOnly)
+        {
+            return string.Join(Environment.NewLine,
+                "This will execute combined config restore actions on the target server:",
+                "",
+                "1. Upload config file and shadowbox_server_config.json.",
+                "2. Restart docker container: shadowbox.",
+                "",
+                "Continue with live restore execution?");
+        }
+
+        if (RestoreServerConfigOnly)
+        {
+            return string.Join(Environment.NewLine,
+                "This will execute server-config-only restore actions on the target server:",
+                "",
+                "1. Upload shadowbox_server_config.json.",
+                "2. Restart docker container: shadowbox.",
+                "",
+                "Continue with live restore execution?");
+        }
+
         if (RestoreConfigOnly)
         {
             return string.Join(Environment.NewLine,
                 "This will execute config-only restore actions on the target server:",
                 "",
-                "1. Upload and overwrite backup config/json in destination path.",
+                "1. Upload and overwrite config file in destination path.",
                 "2. Restart docker container: shadowbox.",
                 "",
                 "Continue with live restore execution?");
@@ -994,6 +1229,11 @@ public sealed class MainViewModel : ObservableObject
         ThemedDialog.Show(title, message);
     }
 
+    private void ShowThemedDialog(string title, string message)
+    {
+        ShowThemedNotification(title, message);
+    }
+
     private bool ShowThemedConfirmation(string title, string message)
     {
         if (_ownerWindow is MainWindow mainWindow)
@@ -1008,25 +1248,25 @@ public sealed class MainViewModel : ObservableObject
     {
         if (Servers.Count == 0)
         {
-            WpfMessageBox.Show("Add at least one server.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Add at least one server.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(WinScpAssemblyPath) || !File.Exists(WinScpAssemblyPath))
         {
-            WpfMessageBox.Show("Set a valid WinSCPnet.dll path.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Set a valid WinSCPnet.dll path.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(PrivateKeyPath) || !File.Exists(PrivateKeyPath))
         {
-            WpfMessageBox.Show("Set a valid private key (.ppk) path.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Set a valid private key (.ppk) path.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(Passphrase))
         {
-            WpfMessageBox.Show("Enter private key passphrase.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Enter private key passphrase.");
             return false;
         }
 
@@ -1036,13 +1276,13 @@ public sealed class MainViewModel : ObservableObject
                 string.IsNullOrWhiteSpace(server.IpAddress) ||
                 string.IsNullOrWhiteSpace(server.RemoteConfigPath))
             {
-                WpfMessageBox.Show("Each server requires Name, IP, and Remote Config Path.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+                ShowThemedDialog("Validation", "Each server requires Name, IP, and Remote Config Path.");
                 return false;
             }
 
             if (!BackupConfigOnly && string.IsNullOrWhiteSpace(server.RemoteDataPath))
             {
-                WpfMessageBox.Show("Each server requires Remote Data Path when config-only backup is disabled.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+                ShowThemedDialog("Validation", "Each server requires Remote Data Path when config-only backup is disabled.");
                 return false;
             }
         }
@@ -1054,26 +1294,72 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(RestoreServerIpAddress))
         {
-            WpfMessageBox.Show("Enter target server IP address.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Enter target server IP address.");
             return false;
         }
 
-        if (!RestoreConfigOnly && (string.IsNullOrWhiteSpace(RestoreDataZipFilePath) || (requireExistingFiles && !File.Exists(RestoreDataZipFilePath))))
+        if (!RestoreConfigOnly && !RestoreServerConfigOnly && (string.IsNullOrWhiteSpace(RestoreDataZipFilePath) || (requireExistingFiles && !File.Exists(RestoreDataZipFilePath))))
         {
             var message = requireExistingFiles
                 ? "Select a valid data zip file."
                 : "Enter data zip file path for preview.";
-            WpfMessageBox.Show(message, "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", message);
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(RestoreConfigFilePath) || (requireExistingFiles && !File.Exists(RestoreConfigFilePath)))
+        if (RestoreConfigOnly && RestoreServerConfigOnly)
         {
-            var message = requireExistingFiles
-                ? "Select a valid configuration json file."
-                : "Enter configuration json file path for preview.";
-            WpfMessageBox.Show(message, "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
-            return false;
+            if (string.IsNullOrWhiteSpace(RestoreConfigFilePath) || (requireExistingFiles && !File.Exists(RestoreConfigFilePath)))
+            {
+                var message = requireExistingFiles
+                    ? "Select a valid config file."
+                    : "Enter config file path for preview.";
+                ShowThemedDialog("Validation", message);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(RestoreServerConfigFilePath) || (requireExistingFiles && !File.Exists(RestoreServerConfigFilePath)))
+            {
+                var message = requireExistingFiles
+                    ? "Select a valid server config file."
+                    : "Enter server config file path for preview.";
+                ShowThemedDialog("Validation", message);
+                return false;
+            }
+        }
+        else if (RestoreConfigOnly)
+        {
+            if (string.IsNullOrWhiteSpace(RestoreConfigFilePath) || (requireExistingFiles && !File.Exists(RestoreConfigFilePath)))
+            {
+                var message = requireExistingFiles
+                    ? "Select a valid config file."
+                    : "Enter config file path for preview.";
+                ShowThemedDialog("Validation", message);
+                return false;
+            }
+        }
+        else if (RestoreServerConfigOnly)
+        {
+            if (string.IsNullOrWhiteSpace(RestoreServerConfigFilePath) || (requireExistingFiles && !File.Exists(RestoreServerConfigFilePath)))
+            {
+                var message = requireExistingFiles
+                    ? "Select a valid server config file."
+                    : "Enter server config file path for preview.";
+                ShowThemedDialog("Validation", message);
+                return false;
+            }
+        }
+        else
+        {
+            var resolvedConfigFilePath = ResolveRestoreConfigFilePath();
+            if (string.IsNullOrWhiteSpace(resolvedConfigFilePath) || (requireExistingFiles && !File.Exists(resolvedConfigFilePath)))
+            {
+                var message = requireExistingFiles
+                    ? $"Could not locate {ServerConfigFileName} next to the selected data zip."
+                    : $"{ServerConfigFileName} will be inferred from the selected data zip folder for preview.";
+                ShowThemedDialog("Validation", message);
+                return false;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(WinScpAssemblyPath) || (requireExistingFiles && !File.Exists(WinScpAssemblyPath)))
@@ -1081,7 +1367,7 @@ public sealed class MainViewModel : ObservableObject
             var message = requireExistingFiles
                 ? "Set a valid WinSCPnet.dll path in Configuration."
                 : "Enter WinSCPnet.dll path in Configuration for preview.";
-            WpfMessageBox.Show(message, "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", message);
             return false;
         }
 
@@ -1090,13 +1376,13 @@ public sealed class MainViewModel : ObservableObject
             var message = requireExistingFiles
                 ? "Set a valid private key (.ppk) path on Restore page."
                 : "Enter private key (.ppk) path on Restore page for preview.";
-            WpfMessageBox.Show(message, "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", message);
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(Passphrase))
         {
-            WpfMessageBox.Show("Enter private key passphrase on Restore page.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Enter private key passphrase on Restore page.");
             return false;
         }
 
@@ -1112,25 +1398,25 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(RestoreServerIpAddress))
         {
-            WpfMessageBox.Show("Enter target server IP address.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Enter target server IP address.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(WinScpAssemblyPath) || !File.Exists(WinScpAssemblyPath))
         {
-            WpfMessageBox.Show("Set a valid WinSCPnet.dll path in Configuration.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Set a valid WinSCPnet.dll path in Configuration.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(PrivateKeyPath) || !File.Exists(PrivateKeyPath))
         {
-            WpfMessageBox.Show("Set a valid private key (.ppk) path on Restore page.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Set a valid private key (.ppk) path on Restore page.");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(Passphrase))
         {
-            WpfMessageBox.Show("Enter private key passphrase on Restore page.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ShowThemedDialog("Validation", "Enter private key passphrase on Restore page.");
             return false;
         }
 
@@ -1168,7 +1454,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            WpfMessageBox.Show($"Import failed.\n{ex.Message}", "Import Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+            ShowThemedDialog("Import Error", $"Import failed.\n{ex.Message}");
         }
     }
 
@@ -1193,7 +1479,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            WpfMessageBox.Show($"Export failed.\n{ex.Message}", "Export Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+            ShowThemedDialog("Export Error", $"Export failed.\n{ex.Message}");
         }
     }
 
@@ -1219,7 +1505,9 @@ public sealed class MainViewModel : ObservableObject
                 BaseBackupDirectory = BaseBackupDirectory.Trim(),
                 RetentionCount = Math.Max(1, RetentionCount),
                 BackupConfigOnly = BackupConfigOnly,
+                BackupServerConfigOnly = BackupServerConfigOnly,
                 RestoreConfigOnly = RestoreConfigOnly,
+                RestoreServerConfigOnly = RestoreServerConfigOnly,
                 Servers = Servers.ToList()
             };
 
@@ -1229,7 +1517,7 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            WpfMessageBox.Show($"Configuration export failed.\n{ex.Message}", "Export Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+            ShowThemedDialog("Export Error", $"Configuration export failed.\n{ex.Message}");
         }
     }
 
@@ -1254,9 +1542,21 @@ public sealed class MainViewModel : ObservableObject
             WinScpAssemblyPath = config.WinScpAssemblyPath;
             PrivateKeyPath = config.PrivateKeyPath;
             BaseBackupDirectory = config.BaseBackupDirectory;
+            ApiKeyDestinationFolder = config.ApiKeyDestinationFolder;
+            if (string.IsNullOrWhiteSpace(ApiKeyDestinationFolder))
+            {
+                ApiKeyDestinationFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "VChannel", "ApiKeys");
+            }
+
+            SyncApiKeySourceSelectionFlags(string.IsNullOrWhiteSpace(config.ApiKeySourcePath)
+                ? ApiKeyRootSourcePath
+                : config.ApiKeySourcePath);
+
             RetentionCount = config.RetentionCount <= 0 ? 1 : config.RetentionCount;
             BackupConfigOnly = config.BackupConfigOnly;
+            BackupServerConfigOnly = config.BackupServerConfigOnly;
             RestoreConfigOnly = config.RestoreConfigOnly;
+            RestoreServerConfigOnly = config.RestoreServerConfigOnly;
 
             Servers.Clear();
             foreach (var server in config.Servers)
@@ -1274,17 +1574,20 @@ public sealed class MainViewModel : ObservableObject
                 BaseBackupDirectory = BaseBackupDirectory,
                 RetentionCount = RetentionCount,
                 BackupConfigOnly = BackupConfigOnly,
+                BackupServerConfigOnly = BackupServerConfigOnly,
                 RestoreConfigOnly = RestoreConfigOnly,
+                RestoreServerConfigOnly = RestoreServerConfigOnly,
                 Servers = Servers.ToList()
             });
 
             RecalculateOverallProgress();
             RaiseAllCanExecuteChanges();
             LogText = $"Imported configuration from {dialog.FileName}";
+            RefreshApiKeyFiles();
         }
         catch (Exception ex)
         {
-            WpfMessageBox.Show($"Configuration import failed.\n{ex.Message}", "Import Error", WpfMessageBoxButton.OK, WpfMessageBoxImage.Error);
+            ShowThemedDialog("Import Error", $"Configuration import failed.\n{ex.Message}");
         }
     }
 
@@ -1353,6 +1656,293 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private void BrowseRestoreServerConfig()
+    {
+        var dialog = new WpfOpenFileDialog
+        {
+            Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            RestoreServerConfigFilePath = dialog.FileName;
+        }
+    }
+
+    private async Task GenerateApiKeyAsync()
+    {
+        if (!ValidateApiKeyGenerationSettings())
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            var apiKeyJson = await _apiKeyService.GenerateApiKeyAsync(
+                WinScpAssemblyPath.Trim(),
+                PrivateKeyPath.Trim(),
+                Passphrase,
+                ApiKeyServerIpAddress.Trim(),
+                GetSelectedApiKeySourcePath(),
+                CancellationToken.None);
+
+            ApiKeyValue = apiKeyJson;
+            LogText = $"Generated API key for {ApiKeyServerIpAddress.Trim()}";
+        }
+        catch (Exception ex)
+        {
+            ShowThemedDialog("API Key Error", $"API key generation failed.\n{ex.Message}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task SaveApiKeyAsync()
+    {
+        if (!ValidateApiKeySaveSettings())
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+
+            var directory = ApiKeyDestinationFolder.Trim();
+            Directory.CreateDirectory(directory);
+
+            var fileName = BuildApiKeyFileName(ApiKeyServerName.Trim());
+            var filePath = Path.Combine(directory, fileName);
+            await File.WriteAllTextAsync(filePath, ApiKeyValue);
+
+            RefreshApiKeyFiles();
+            LogText = $"Saved API key to {filePath}";
+        }
+        catch (Exception ex)
+        {
+            ShowThemedDialog("API Key Error", $"Failed to save API key.\n{ex.Message}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void CopyApiKeyToClipboard()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKeyValue))
+        {
+            ShowThemedDialog("API Key", "Generate an API key before copying.");
+            return;
+        }
+
+        System.Windows.Clipboard.SetText(ApiKeyValue);
+        LogText = $"Copied API key to clipboard at {DateTime.Now:HH:mm:ss}";
+    }
+
+    private void ClearAndPasteApiKeyServerIp()
+    {
+        ApiKeyServerIpAddress = string.Empty;
+
+        if (System.Windows.Clipboard.ContainsText())
+        {
+            ApiKeyServerIpAddress = System.Windows.Clipboard.GetText(System.Windows.TextDataFormat.Text).Trim();
+        }
+    }
+
+    private void ClearAndPasteRestoreServerIp()
+    {
+        RestoreServerIpAddress = string.Empty;
+
+        if (System.Windows.Clipboard.ContainsText())
+        {
+            RestoreServerIpAddress = System.Windows.Clipboard.GetText(System.Windows.TextDataFormat.Text).Trim();
+        }
+    }
+
+    private void BrowseApiKeyDestinationFolder()
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Select API key destination folder"
+        };
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            ApiKeyDestinationFolder = dialog.SelectedPath;
+            // Persist the last-used API key destination immediately so it's remembered
+            _ = PersistApiKeyDestinationFolderAsync();
+        }
+    }
+
+    private async Task PersistApiKeyDestinationFolderAsync()
+    {
+        try
+        {
+            var config = new AppConfig
+            {
+                WinScpAssemblyPath = WinScpAssemblyPath?.Trim() ?? string.Empty,
+                PrivateKeyPath = PrivateKeyPath?.Trim() ?? string.Empty,
+                BaseBackupDirectory = BaseBackupDirectory?.Trim() ?? string.Empty,
+                ApiKeyDestinationFolder = ApiKeyDestinationFolder?.Trim() ?? string.Empty,
+                ApiKeySourcePath = GetSelectedApiKeySourcePath(),
+                RetentionCount = Math.Max(1, RetentionCount),
+                BackupConfigOnly = BackupConfigOnly,
+                BackupServerConfigOnly = BackupServerConfigOnly,
+                RestoreConfigOnly = RestoreConfigOnly,
+                RestoreServerConfigOnly = RestoreServerConfigOnly,
+                Servers = Servers.ToList()
+            };
+
+            await _settingsService.SaveAsync(config);
+            LogText = $"Saved API key destination at {DateTime.Now:HH:mm:ss}";
+        }
+        catch (Exception ex)
+        {
+            ShowThemedDialog("Save Error", $"Failed to persist API key destination.\n{ex.Message}");
+        }
+    }
+
+    private void LoadApiKeyEntry(object? parameter)
+    {
+        if (parameter is not ApiKeyFileEntry entry || !File.Exists(entry.FilePath))
+        {
+            return;
+        }
+
+        ApiKeyServerName = entry.ServerName;
+        ApiKeyServerIpAddress = entry.IpAddress;
+        ApiKeyValue = entry.ApiKeyJson;
+        LogText = $"Loaded API key from {entry.FileName}";
+    }
+
+    private void DeleteApiKeyEntry(object? parameter)
+    {
+        if (parameter is not ApiKeyFileEntry entry || !File.Exists(entry.FilePath))
+        {
+            return;
+        }
+
+        var confirm = ShowThemedConfirmation("Confirm", $"Delete {entry.FileName}?");
+
+        if (!confirm)
+        {
+            return;
+        }
+
+        File.Delete(entry.FilePath);
+        RefreshApiKeyFiles();
+        LogText = $"Deleted API key file {entry.FileName}";
+    }
+
+    private void RefreshApiKeyFiles()
+    {
+        ApiKeyFiles.Clear();
+
+        var directory = ApiKeyDestinationFolder?.Trim();
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            return;
+        }
+
+        foreach (var filePath in Directory.EnumerateFiles(directory, "*-access.txt")
+                     .OrderByDescending(File.GetCreationTime))
+        {
+            if (ApiKeyFileEntry.TryLoad(filePath, out var entry) && entry is not null)
+            {
+                ApiKeyFiles.Add(entry);
+            }
+        }
+    }
+
+    private string GetSelectedApiKeySourcePath()
+    {
+        return IsApiKeyOutlineSourceSelected ? ApiKeyOutlineSourcePath : ApiKeyRootSourcePath;
+    }
+
+    private bool ValidateApiKeyGenerationSettings()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKeyServerIpAddress))
+        {
+            ShowThemedDialog("Validation", "Enter server IP address.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(WinScpAssemblyPath) || !File.Exists(WinScpAssemblyPath))
+        {
+            ShowThemedDialog("Validation", "Set a valid WinSCPnet.dll path.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(PrivateKeyPath) || !File.Exists(PrivateKeyPath))
+        {
+            ShowThemedDialog("Validation", "Set a valid private key (.ppk) path.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(Passphrase))
+        {
+            ShowThemedDialog("Validation", "Enter private key passphrase.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateApiKeySaveSettings()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKeyValue))
+        {
+            ShowThemedDialog("Validation", "Generate an API key first.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(ApiKeyServerName))
+        {
+            ShowThemedDialog("Validation", "Enter a server name.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(ApiKeyDestinationFolder))
+        {
+            ShowThemedDialog("Validation", "Select a destination folder.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string BuildApiKeyFileName(string serverName)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(serverName.Where(character => !invalidChars.Contains(character)).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            sanitized = "server";
+        }
+
+        return $"{sanitized}-access.txt";
+    }
+
+    private static string NormalizeRemotePath(string remotePath)
+    {
+        var normalized = (remotePath ?? string.Empty).Trim().Replace('\\', '/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        if (!normalized.EndsWith('/'))
+        {
+            normalized += "/";
+        }
+
+        return normalized;
+    }
+
     private void RaiseAllCanExecuteChanges()
     {
         AddServerCommand.RaiseCanExecuteChanged();
@@ -1371,6 +1961,7 @@ public sealed class MainViewModel : ObservableObject
         BrowseBaseDirectoryCommand.RaiseCanExecuteChanged();
         BrowseRestoreDataZipCommand.RaiseCanExecuteChanged();
         BrowseRestoreConfigCommand.RaiseCanExecuteChanged();
+        BrowseRestoreServerConfigCommand.RaiseCanExecuteChanged();
         RefreshRestorePreviewCommand.RaiseCanExecuteChanged();
         ApplyServerTuningCommand.RaiseCanExecuteChanged();
         StartRestoreCommand.RaiseCanExecuteChanged();
@@ -1379,6 +1970,14 @@ public sealed class MainViewModel : ObservableObject
         NavigateHomeCommand.RaiseCanExecuteChanged();
         NavigateBackupPageCommand.RaiseCanExecuteChanged();
         NavigateRestorePageCommand.RaiseCanExecuteChanged();
+        NavigateApiKeysPageCommand.RaiseCanExecuteChanged();
+        GenerateApiKeyCommand.RaiseCanExecuteChanged();
+        SaveApiKeyCommand.RaiseCanExecuteChanged();
+        CopyApiKeyCommand.RaiseCanExecuteChanged();
+        ClearPasteApiKeyServerIpCommand.RaiseCanExecuteChanged();
+        BrowseApiKeyDestinationCommand.RaiseCanExecuteChanged();
+        ViewApiKeyCommand.RaiseCanExecuteChanged();
+        DeleteApiKeyCommand.RaiseCanExecuteChanged();
     }
 
     private void RecalculateOverallProgress()

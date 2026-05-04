@@ -1,7 +1,4 @@
 using System.Windows;
-using WpfMessageBox = System.Windows.MessageBox;
-using WpfMessageBoxButton = System.Windows.MessageBoxButton;
-using WpfMessageBoxImage = System.Windows.MessageBoxImage;
 using VCSyncBackupApp.Models;
 
 namespace VCSyncBackupApp;
@@ -33,7 +30,7 @@ public partial class AddServerDialog : Window
             string.IsNullOrWhiteSpace(remoteDataPath) ||
             string.IsNullOrWhiteSpace(remoteConfigPath))
         {
-            WpfMessageBox.Show("Please fill in Name, IP Address, Remote Data Path, and Remote Config Path.", "Validation", WpfMessageBoxButton.OK, WpfMessageBoxImage.Warning);
+            ThemedDialog.Show(this, "Validation", "Please fill in Name, IP Address, Remote Data Path, and Remote Config Path.");
             return;
         }
 

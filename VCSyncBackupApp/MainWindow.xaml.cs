@@ -24,6 +24,15 @@ public partial class MainWindow : Window
         await _viewModel.InitializeAsync();
         PassphraseBox.Password = _viewModel.Passphrase;
         RestorePassphraseBox.Password = _viewModel.Passphrase;
+        // Keep API key passphrase box in sync as well (if present)
+        try
+        {
+            ApiKeyPassphraseBox.Password = _viewModel.Passphrase;
+        }
+        catch
+        {
+            // Ignore if the control doesn't exist in older layouts
+        }
     }
 
     private void PassphraseBox_OnPasswordChanged(object sender, RoutedEventArgs e)
@@ -57,6 +66,19 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(source, RestorePassphraseBox) && RestorePassphraseBox.Password != passphrase)
             {
                 RestorePassphraseBox.Password = passphrase;
+            }
+
+            // Sync API key passphrase box when available
+            try
+            {
+                if (!ReferenceEquals(source, ApiKeyPassphraseBox) && ApiKeyPassphraseBox.Password != passphrase)
+                {
+                    ApiKeyPassphraseBox.Password = passphrase;
+                }
+            }
+            catch
+            {
+                // Ignore if control missing
             }
         }
         finally

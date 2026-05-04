@@ -10,6 +10,7 @@ namespace VCSyncBackupApp.Services;
 
 public sealed class BackupService
 {
+    private const string ServerConfigFileName = "shadowbox_server_config.json";
     private static readonly Regex PercentRegex = new(@"(?<pct>\d{1,3})%", RegexOptions.Compiled);
     private static readonly Regex CliTransferLineRegex = new(@"^\s*(?<name>[^|]+?)\s*\|.*\|\s*(?<pct>\d{1,3})%\s*$", RegexOptions.Compiled);
 
@@ -20,6 +21,7 @@ public sealed class BackupService
         string logRoot,
         IProgress<ServerBackupProgress>? progress,
         bool configOnly,
+        bool serverConfigOnly,
         CancellationToken cancellationToken)
     {
         var serverBase = Path.Combine(config.BaseBackupDirectory, server.Name);
@@ -56,6 +58,20 @@ public sealed class BackupService
                     OpenSession(session, sessionOptions);
                     logger.Add($"[{DateTime.Now:HH:mm:ss}] Connected to server via WinSCP .NET assembly");
 
+                    if (serverConfigOnly)
+                    {
+                        progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 60, Message = "Downloading server config" });
+                        var remoteConfig = GetServerConfigRemotePath(server.RemoteConfigPath);
+                        var localConfig = Path.Combine(serverBase, Path.GetFileName(remoteConfig));
+                        DownloadFile(session, remoteConfig, localConfig);
+                        logger.Add($"[{DateTime.Now:HH:mm:ss}] Server config download complete: {localConfig}");
+
+                        if (!configOnly)
+                        {
+                            return;
+                        }
+                    }
+
                     if (configOnly)
                     {
                         progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 60, Message = "Downloading config" });
@@ -84,10 +100,17 @@ public sealed class BackupService
                     logger.Add($"[{DateTime.Now:HH:mm:ss}] WinSCP .NET assembly incompatible on this runtime. Falling back to WinSCP CLI.");
 
                     progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Running", ProgressPercent = 30, Message = "Using WinSCP CLI fallback" });
-                    RunWinScpCliTransfer(server, config, passphrase, dataFolder, serverBase, configOnly, logger, progress, cancellationToken);
+                    RunWinScpCliTransfer(server, config, passphrase, dataFolder, serverBase, configOnly, serverConfigOnly, logger, progress, cancellationToken);
                     logger.Add($"[{DateTime.Now:HH:mm:ss}] Connected and transferred via WinSCP CLI fallback");
                 }
             }, cancellationToken);
+
+            if (serverConfigOnly && !configOnly)
+            {
+                logger.Add($"[{DateTime.Now:HH:mm:ss}] Server-config-only backup completed.");
+                progress?.Report(new ServerBackupProgress { ServerName = server.Name, Status = "Success", ProgressPercent = 100, Message = "Completed (server config only)" });
+                return;
+            }
 
             if (configOnly)
             {
@@ -340,6 +363,7 @@ public sealed class BackupService
         string dataFolder,
         string serverBase,
         bool configOnly,
+        bool serverConfigOnly,
         List<string> logger,
         IProgress<ServerBackupProgress>? progress,
         CancellationToken cancellationToken)
@@ -349,10 +373,12 @@ public sealed class BackupService
         var cliPath = ResolveWinScpCliPath(config.WinScpAssemblyPath);
         var remoteData = server.RemoteDataPath.Replace('\\', '/');
         var remoteConfig = server.RemoteConfigPath.Replace('\\', '/');
+        var serverConfigRemote = GetServerConfigRemotePath(server.RemoteConfigPath);
         var localConfig = Path.Combine(serverBase, Path.GetFileName(remoteConfig));
-        var remoteTotalBytes = configOnly ? null : TryGetRemoteDirectorySizeViaCli(cliPath, server, config, passphrase);
+        var localServerConfig = Path.Combine(serverBase, Path.GetFileName(serverConfigRemote));
+        var remoteTotalBytes = (configOnly || serverConfigOnly) ? null : TryGetRemoteDirectorySizeViaCli(cliPath, server, config, passphrase);
 
-        if (!configOnly)
+        if (!configOnly && !serverConfigOnly)
         {
             Directory.CreateDirectory(dataFolder);
         }
@@ -365,8 +391,9 @@ public sealed class BackupService
                 "option batch abort",
                 "option confirm off",
                 $"open sftp://root@{EscapeWinScpArg(server.IpAddress)}/ -privatekey=\"{EscapeWinScpArg(config.PrivateKeyPath)}\" -passphrase=\"{EscapeWinScpArg(passphrase)}\" -hostkey=\"*\"",
-                configOnly ? string.Empty : $"synchronize local \"{EscapeWinScpArg(dataFolder)}\" \"{EscapeWinScpArg(remoteData)}\"",
-                $"get \"{EscapeWinScpArg(remoteConfig)}\" \"{EscapeWinScpArg(localConfig)}\"",
+                serverConfigOnly ? $"get \"{EscapeWinScpArg(serverConfigRemote)}\" \"{EscapeWinScpArg(localServerConfig)}\"" : string.Empty,
+                configOnly || serverConfigOnly ? string.Empty : $"synchronize local \"{EscapeWinScpArg(dataFolder)}\" \"{EscapeWinScpArg(remoteData)}\"",
+                configOnly ? $"get \"{EscapeWinScpArg(remoteConfig)}\" \"{EscapeWinScpArg(localConfig)}\"" : string.Empty,
                 "exit"
             }.Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
 
@@ -542,6 +569,31 @@ public sealed class BackupService
     private static string EscapeWinScpArg(string value)
     {
         return value.Replace("\"", "\"\"");
+    }
+
+    private static string GetServerConfigRemotePath(string configuredRemoteConfigPath)
+    {
+        var normalized = (configuredRemoteConfigPath ?? string.Empty).Replace('\\', '/').Trim();
+        string directory;
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            directory = "/root/shadowbox";
+        }
+        else if (normalized.EndsWith('/'))
+        {
+            directory = normalized.TrimEnd('/');
+        }
+        else
+        {
+            directory = Path.GetDirectoryName(normalized)?.Replace('\\', '/') ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                directory = "/root/shadowbox";
+            }
+        }
+
+        return $"{directory.TrimEnd('/')}/{ServerConfigFileName}";
     }
 
     private static long GetDirectorySizeBytes(string rootPath)
