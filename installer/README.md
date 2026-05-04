@@ -1,10 +1,10 @@
-# VC Sync v2.1.0 - Installation Guide
+# VC Sync v2.2.0 - Installation Guide
 
 ## Quick Start
 
 ### Using the Installer (Recommended)
 
-1. **Download** `VC-Sync-2.1.0-Installer.zip` from the [releases page](https://github.com/koyan04/VC-Sync/releases)
+1. **Download** `VC-Sync-2.2.0-Installer.zip` from the [releases page](https://github.com/koyan04/VC-Sync/releases)
 2. **Extract** the ZIP file to a temporary location
 3. **Run** `Setup.bat` - Windows will prompt for administrator privileges
 4. **Follow** the installation wizard
@@ -25,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File ".\Install-VCSync.ps1" -InstallPath "D:
 
 ## Portable Version
 
-If you prefer not to use the installer, download `VC-Sync-Setup-2.1.0.zip` which contains just the application binaries. Extract and run `VCSyncBackupApp.exe` directly.
+If you prefer not to use the installer, download `VC-Sync-Setup-2.2.0.zip` which contains just the application binaries. Extract and run `VCSyncBackupApp.exe` directly.
 
 ## System Requirements
 

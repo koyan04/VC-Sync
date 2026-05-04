@@ -28,10 +28,10 @@ Open Command Prompt or PowerShell and run:
 2. File → Open (or press Ctrl+O)
 3. Navigate to and select `VC-Sync-Setup.iss`
 4. Click the Compile button (or press F9)
-5. The installer will be created in `installer\dist\` as `VC-Sync-Setup-2.1.0.exe`
+5. The installer will be created in `installer\dist\` as `VC-Sync-Setup-2.2.0.exe`
 
 ### Step 3: Distribute
-The compiled `.exe` file (`VC-Sync-Setup-2.1.0.exe`) will be a standalone installer that users can run directly.
+The compiled `.exe` file (`VC-Sync-Setup-2.2.0.exe`) will be a standalone installer that users can run directly.
 
 ## Option 3: Use the Provided PowerShell Installer
 
